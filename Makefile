@@ -23,4 +23,13 @@ typecheck:
 test:
 	$(BIN)/pytest -v
 
+docker-up:
+	docker compose up -d postgres
+
+docker-down:
+	docker compose down
+
+docker-ps:
+	docker compose ps
+
 check-all: lint typecheck test

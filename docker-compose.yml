@@ -1,0 +1,50 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: omniops-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-omniops}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-omniops}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - omniops-network
+
+  langfuse:
+    image: langfuse/langfuse:2
+    container_name: omniops-langfuse
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-omniops}
+      NEXTAUTH_URL: http://localhost:3000
+      NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET:-my-super-secret-nextauth-key-12345}
+      SALT: ${LANGFUSE_SALT:-my-super-secret-salt-12345}
+      TELEMETRY_ENABLED: "false"
+    ports:
+      - "3000:3000"
+    networks:
+      - omniops-network
+
+volumes:
+  postgres_data:
+    name: omniops_postgres_data
+  langfuse_data:
+    name: omniops_langfuse_data
+
+networks:
+  omniops-network:
+    name: omniops-network
+    driver: bridge
