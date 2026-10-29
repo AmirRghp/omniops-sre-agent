@@ -712,6 +712,9 @@ def main() -> None:
         print(generate_comparison_table(r1, r2))
         return
 
+    if sys.platform == 'win32':
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
     asyncio.run(
         run_benchmark(
             scenarios_path=args.scenarios,
