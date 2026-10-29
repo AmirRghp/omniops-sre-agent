@@ -26,7 +26,9 @@ def test_infra_service_model_attributes() -> None:
     assert table.c.active_connections.default is not None
     assert table.c.active_connections.default.arg == 20
 
-    check_constraints = [c for c in getattr(table, "constraints", set()) if isinstance(c, CheckConstraint)]
+    check_constraints = [
+        c for c in getattr(table, "constraints", set()) if isinstance(c, CheckConstraint)
+    ]
     assert any("HEALTHY" in str(c.sqltext) for c in check_constraints)
 
     service = InfraService(

@@ -1,0 +1,172 @@
+[
+  {
+    "runbook_id": "RB-101",
+    "title": "Mitigating High CPU Throttling in Microservices",
+    "title_fa": "مدیریت و رفع گلوگاه مصرف بالای پردازنده (CPU Throttling)",
+    "category": "containers",
+    "target_services": ["auth-service", "payment-api"],
+    "error_codes": ["WARN_HIGH_CPU_THROTTLING", "ERR_CPU_SATURATED"],
+    "symptoms": "CPU usage exceeds 90% and response latency degrades under load. Active replicas are insufficient for incoming traffic.",
+    "symptoms_fa": "مصرف پردازنده از ۹۰ درصد فراتر رفته و تاخیر پاسخگویی افزایش یافته است. تعداد رپلیکاهای فعال برای حجم ترافیک ورودی کافی نیست.",
+    "content": "When WARN_HIGH_CPU_THROTTLING is observed and memory usage remains stable, horizontal pod autoscaling should be triggered. Do not restart the container, as it causes cold-start latency. Instead, execute 'scale_replicas' to scale up active instances (e.g. from 2 to 4 replicas).",
+    "recommended_action": {
+      "action_type": "scale_replicas",
+      "parameters": {
+        "replicas": 4
+      }
+    }
+  },
+  {
+    "runbook_id": "RB-102",
+    "title": "Redis Cache Out-Of-Memory Eviction Resolution",
+    "title_fa": "رفع خطای کمبود حافظه و اخراج کلیدها در ردیس (OOM Eviction)",
+    "category": "caching",
+    "target_services": ["redis-cache"],
+    "error_codes": ["ERR_REDIS_OOM_EVICTION", "ERR_REDIS_MEMORY_LIMIT"],
+    "symptoms": "Redis memory usage exceeds 95% of allocated memory limit (e.g. >4000MB out of 4096MB) leading to aggressive key evictions and cache misses.",
+    "symptoms_fa": "مصرف حافظه ردیس از ۹۵ درصد حد مجاز فراتر رفته و باعث اخراج سریع کلیدها و از دست رفتن داده‌های کش شده است.",
+    "content": "When ERR_REDIS_OOM_EVICTION occurs, stale session keys and volatile caches must be purged immediately to prevent service failure. Execute 'flush_redis_cache' with parameters {'target': 'all'} or specific cache prefixes.",
+    "recommended_action": {
+      "action_type": "flush_redis_cache",
+      "parameters": {
+        "target": "all"
+      }
+    }
+  },
+  {
+    "runbook_id": "RB-103",
+    "title": "Handling Ingress 502 Bad Gateway Upstream Timeouts",
+    "title_fa": "مدیریت خطای 502 Bad Gateway در لایه ورودی اینگرس",
+    "category": "networking",
+    "target_services": ["nginx-ingress", "payment-api"],
+    "error_codes": ["HTTP_502_BAD_GATEWAY", "ERR_UPSTREAM_TIMEOUT"],
+    "symptoms": "Nginx Ingress reports 502 Bad Gateway when forwarding requests to degraded backend microservices such as payment-api.",
+    "symptoms_fa": "وب‌سرور یا لایه ورودی Nginx در فوروارد درخواست‌ها به سرویس‌های پشتی مانند پرداخت با خطای 502 مواجه می‌شود.",
+    "content": "HTTP 502 errors typically signify that the upstream backend service is either restarting or timing out due to resource exhaustion. Always inspect the health and error logs of the upstream target service before modifying ingress rules.",
+    "recommended_action": {
+      "action_type": "restart_service",
+      "parameters": {
+        "grace_period_seconds": 15
+      }
+    }
+  },
+  {
+    "runbook_id": "RB-104",
+    "title": "Resolving Database Connection Pool Exhaustion",
+    "title_fa": "رفع اتمام ظرفیت استخر اتصالات پایگاه داده (Connection Pool)",
+    "category": "database",
+    "target_services": ["payment-api", "auth-service"],
+    "error_codes": ["ERR_DB_POOL_EXHAUSTED", "ERR_DB_TIMEOUT"],
+    "symptoms": "Application logs indicate QueuePool limit reached (e.g. 100/100 active connections) while CPU usage on postgres-primary is low to moderate.",
+    "symptoms_fa": "لاگ‌های سرویس نشان‌دهنده پر شدن استخر اتصالات دیتابیس (۱۰۰ از ۱۰۰) در حالی است که مصرف CPU دیتابیس در حد نرمال است.",
+    "content": "When ERR_DB_POOL_EXHAUSTED occurs and database CPU is healthy (<50%), do NOT restart the database. Instead, execute 'increase_db_pool' on the calling service to raise pool_size from 100 to 200.",
+    "recommended_action": {
+      "action_type": "increase_db_pool",
+      "parameters": {
+        "db_pool_size": 200
+      }
+    }
+  },
+  {
+    "runbook_id": "RB-105",
+    "title": "PostgreSQL Primary Replication Lag and Lock Contention",
+    "title_fa": "بررسی تاخیر رپلیکیشن و قفل‌های تراکنشی در پستگرس",
+    "category": "database",
+    "target_services": ["postgres-primary"],
+    "error_codes": ["ERR_PG_LOCK_TIMEOUT", "WARN_PG_REPLICA_LAG"],
+    "symptoms": "Long running queries block transactions, resulting in lock wait timeouts and elevated replication lag.",
+    "symptoms_fa": "کوئری‌های طولانی باعث قفل شدن ردیف‌ها و افزایش تاخیر رپلیکیشن شده‌اند.",
+    "content": "Identify the blocking PID in pg_stat_activity. If a specific query is deadlocked, terminate the idle-in-transaction connection or restart the offending client service.",
+    "recommended_action": {
+      "action_type": "restart_service",
+      "parameters": {
+        "grace_period_seconds": 30
+      }
+    }
+  },
+  {
+    "runbook_id": "RB-106",
+    "title": "Authentication Service JWT Verification Deadlock",
+    "title_fa": "رفع بن‌بست و تاخیر تایید توکن JWT در سرویس احراز هویت",
+    "category": "containers",
+    "target_services": ["auth-service"],
+    "error_codes": ["ERR_JWT_VERIFICATION_TIMEOUT", "ERR_AUTH_DEADLOCK"],
+    "symptoms": "P95 latency of auth-service spikes over 3000ms due to key rotation or lock contention.",
+    "symptoms_fa": "تاخیر P95 سرویس احراز هویت به بیش از ۳۰۰۰ میلی‌ثانیه افزایش یافته است.",
+    "content": "Verify public key cache validity. If instances become unresponsive due to thread starvation, execute 'restart_service' with rolling grace period.",
+    "recommended_action": {
+      "action_type": "restart_service",
+      "parameters": {
+        "grace_period_seconds": 10
+      }
+    }
+  },
+  {
+    "runbook_id": "RB-107",
+    "title": "Ingress SSL/TLS Handshake Failures",
+    "title_fa": "بررسی و رفع خطاهای دست‌تکانی SSL/TLS در اینگرس",
+    "category": "networking",
+    "target_services": ["nginx-ingress"],
+    "error_codes": ["ERR_TLS_HANDSHAKE_FAILED", "WARN_CERT_EXPIRING"],
+    "symptoms": "Clients report connection reset or TLS handshake timeout during HTTPS negotiation.",
+    "symptoms_fa": "کلاینت‌ها با خطای انقضای نشست یا خطای دست‌تکانی TLS مواجه می‌شوند.",
+    "content": "Check certificate secret expiration and cipher suite compatibility. In case of memory corruption or worker stall, execute 'restart_service' for nginx-ingress.",
+    "recommended_action": {
+      "action_type": "restart_service",
+      "parameters": {
+        "grace_period_seconds": 5
+      }
+    }
+  },
+  {
+    "runbook_id": "RB-108",
+    "title": "Redis Connection Dropped and Socket Leak",
+    "title_fa": "نشت سوکت و قطع ارتباط با سرور ردیس",
+    "category": "caching",
+    "target_services": ["redis-cache"],
+    "error_codes": ["ERR_REDIS_CONN_DROPPED", "ERR_REDIS_CLIENT_OVERFLOW"],
+    "symptoms": "Client connections to Redis are refused due to maxclients reached or hung sockets.",
+    "symptoms_fa": "اتصالات کلاینت به ردیس به دلیل پر شدن سقف maxclients رد می‌شوند.",
+    "content": "Inspect connected clients via client list. Purge inactive connections or restart the caching container if memory corruption occurred.",
+    "recommended_action": {
+      "action_type": "restart_service",
+      "parameters": {
+        "grace_period_seconds": 10
+      }
+    }
+  },
+  {
+    "runbook_id": "RB-109",
+    "title": "Payment API Gateway Circuit Breaker Tripped",
+    "title_fa": "فعال شدن Circuit Breaker در درگاه پرداخت",
+    "category": "general",
+    "target_services": ["payment-api"],
+    "error_codes": ["ERR_CIRCUIT_BREAKER_TRIPPED", "ERR_BANK_GATEWAY_TIMEOUT"],
+    "symptoms": "External bank API timeouts trigger internal circuit breaker, rejecting downstream checkout calls.",
+    "symptoms_fa": "تاخیر در درگاه پرداخت بانکی خارجی منجر به باز شدن Circuit Breaker داخلی و رد تراکنش‌ها شده است.",
+    "content": "Verify outbound NAT and PSP health. If network state is recovered, scale backend worker replicas to drain pending payment queues rapidly.",
+    "recommended_action": {
+      "action_type": "scale_replicas",
+      "parameters": {
+        "replicas": 4
+      }
+    }
+  },
+  {
+    "runbook_id": "RB-110",
+    "title": "Ephemeral Disk Space Exhaustion on Worker Nodes",
+    "title_fa": "پر شدن فضای دیسک موقت روی نودهای پردازشی",
+    "category": "containers",
+    "target_services": ["payment-api", "auth-service"],
+    "error_codes": ["ERR_DISK_PRESSURE", "WARN_LOG_VOLUME_FULL"],
+    "symptoms": "Container local storage reaches 98% capacity due to unrotated verbose logging.",
+    "symptoms_fa": "فضای دیسک محلی کانتینر به علت حجم بالای لاگ‌ها پر شده است.",
+    "content": "Trigger log rotate and prune temporary files. If storage remains locked by dead processes, restart service to clean ephemerals.",
+    "recommended_action": {
+      "action_type": "restart_service",
+      "parameters": {
+        "grace_period_seconds": 10
+      }
+    }
+  }
+]
