@@ -26,8 +26,22 @@ def test_default_settings() -> None:
     assert settings.LLM_MODEL_NAME == "Qwen/Qwen2.5-7B-Instruct-AWQ"
     assert settings.LLM_BASE_URL == "http://localhost:8000/v1"
     assert settings.MAX_AGENT_STEPS == 6
+    assert settings.MAX_AGENT_TOKENS == 4096
+    assert settings.MAX_TOKENS == 4096
     assert settings.DATABASE_URL.startswith("postgresql+asyncpg://")
     assert settings.OMNIDOC_RAG_URL == "http://localhost:8080/api/v1/query"
+
+
+def test_settings_env_override(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test overriding settings via environment variables."""
+    monkeypatch.setenv("APP_NAME", "omniops-test")
+    monkeypatch.setenv("MAX_AGENT_STEPS", "10")
+    monkeypatch.setenv("MAX_AGENT_TOKENS", "8192")
+    override_settings = Settings()
+    assert override_settings.APP_NAME == "omniops-test"
+    assert override_settings.MAX_AGENT_STEPS == 10
+    assert override_settings.MAX_AGENT_TOKENS == 8192
+    assert override_settings.MAX_TOKENS == 8192
 
 
 def test_settings_singleton() -> None:
@@ -52,6 +66,16 @@ def test_load_yaml_config_missing_file(tmp_path: Path) -> None:
     with pytest.raises(ConfigurationError) as exc_info:
         load_yaml_config(missing_file)
     assert exc_info.value.error_code == "CONFIGURATION_ERROR"
+
+
+def test_load_yaml_config_malformed(tmp_path: Path) -> None:
+    """Test ConfigurationError raised when YAML has invalid syntax."""
+    bad_yaml = tmp_path / "bad.yaml"
+    bad_yaml.write_text("app: [unclosed bracket", encoding="utf-8")
+    with pytest.raises(ConfigurationError) as exc_info:
+        load_yaml_config(bad_yaml)
+    assert exc_info.value.error_code == "CONFIGURATION_ERROR"
+    assert "error" in exc_info.value.details
 
 
 def test_exception_hierarchy() -> None:
@@ -112,18 +136,18 @@ def test_logger_setup_and_json_formatter() -> None:
         level=logging.INFO,
         pathname=__file__,
         lineno=10,
-        msg="Test message with param: %s",
+        msg="Test message with param: %s and Bearer eyJhbGciOiJIUzI1NiJ9",
         args=("foo",),
         exc_info=None,
     )
-    setattr(record, "correlation_id", "corr-12345")
-    setattr(record, "service_name", "payment-api")
-    setattr(record, "extra_data", {"api_key": "secret_abc", "status": "ok"})
+    record.__dict__["correlation_id"] = "corr-12345"
+    record.__dict__["service_name"] = "payment-api"
+    record.__dict__["extra_data"] = {"api_key": "secret_abc", "status": "ok"}
 
     formatted_json = formatter.format(record)
     parsed = json.loads(formatted_json)
     assert parsed["level"] == "INFO"
-    assert parsed["message"] == "Test message with param: foo"
+    assert parsed["message"] == "Test message with param: foo and Bearer [REDACTED]"
     assert parsed["correlation_id"] == "corr-12345"
     assert parsed["service_name"] == "payment-api"
     assert parsed["extra_data"]["api_key"] == "[REDACTED]"

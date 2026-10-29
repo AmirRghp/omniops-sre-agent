@@ -37,9 +37,16 @@ class Settings(BaseSettings):
     FALLBACK_RUNBOOKS_PATH: str = "data/fallback_runbooks.json"
 
     # Agent Constraints & Limits
-    MAX_AGENT_STEPS: int = Field(default=6, ge=1, le=20)
-    MAX_AGENT_TOKENS: int = Field(default=4096, ge=512, le=32768)
+    MAX_AGENT_STEPS: int = Field(default=6, ge=1, le=20, validation_alias="MAX_AGENT_STEPS")
+    MAX_AGENT_TOKENS: int = Field(
+        default=4096, ge=512, le=32768, validation_alias="MAX_AGENT_TOKENS"
+    )
     API_KEY: str = "dev-secret-key-12345"
+
+    @property
+    def MAX_TOKENS(self) -> int:
+        """Alias for MAX_AGENT_TOKENS to maintain consistency with docs/SECURITY.md."""
+        return self.MAX_AGENT_TOKENS
 
     # Observability (Langfuse)
     LANGFUSE_PUBLIC_KEY: str | None = None

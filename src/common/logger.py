@@ -15,6 +15,31 @@ SENSITIVE_KEY_PATTERNS = [
     re.compile(r"authorization", re.IGNORECASE),
 ]
 
+# Patterns for inline textual secrets (e.g. Bearer eyJ..., token=...)
+INLINE_SECRET_PATTERNS = [
+    (re.compile(r"(Bearer\s+)[A-Za-z0-9\-._~+/]+=*", re.IGNORECASE), r"\1[REDACTED]"),
+    (
+        re.compile(r"(api[_-]?key\s*[=:]\s*['\"]?)[A-Za-z0-9\-_]+(['\"]?)", re.IGNORECASE),
+        r"\1[REDACTED]\2",
+    ),
+    (
+        re.compile(r"(password\s*[=:]\s*['\"]?)[^\s'\"]+(['\"]?)", re.IGNORECASE),
+        r"\1[REDACTED]\2",
+    ),
+    (
+        re.compile(r"(token\s*[=:]\s*['\"]?)[A-Za-z0-9\-._~+/]+=*(['\"]?)", re.IGNORECASE),
+        r"\1[REDACTED]\2",
+    ),
+]
+
+
+def sanitize_message_text(message: str) -> str:
+    """Mask inline secrets in raw text messages."""
+    sanitized = message
+    for pattern, replacement in INLINE_SECRET_PATTERNS:
+        sanitized = pattern.sub(replacement, sanitized)
+    return sanitized
+
 
 def sanitize_log_record_data(data: Any) -> Any:
     """Recursively mask sensitive values in dictionaries and lists."""
@@ -35,11 +60,12 @@ class JSONFormatter(logging.Formatter):
     """Format log records as single-line JSON objects."""
 
     def format(self, record: logging.LogRecord) -> str:
+        raw_message = record.getMessage()
         log_payload: dict[str, Any] = {
             "timestamp": self.formatTime(record, self.datefmt),
             "level": record.levelname,
             "logger": record.name,
-            "message": record.getMessage(),
+            "message": sanitize_message_text(raw_message),
         }
 
         # Include standard extra fields if present
@@ -56,6 +82,14 @@ class JSONFormatter(logging.Formatter):
             log_payload["exception"] = self.formatException(record.exc_info)
 
         return json.dumps(log_payload, ensure_ascii=False)
+
+
+class TextFormatter(logging.Formatter):
+    """Format log records as human-readable text while masking inline secrets."""
+
+    def format(self, record: logging.LogRecord) -> str:
+        formatted = super().format(record)
+        return sanitize_message_text(formatted)
 
 
 def setup_logger(
@@ -84,7 +118,7 @@ def setup_logger(
         if json_format:
             formatter: logging.Formatter = JSONFormatter()
         else:
-            formatter = logging.Formatter(
+            formatter = TextFormatter(
                 fmt="%(asctime)s [%(levelname)s] [%(name)s] %(message)s",
                 datefmt="%Y-%m-%d %H:%M:%S",
             )
