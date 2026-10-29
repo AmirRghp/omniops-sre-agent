@@ -20,14 +20,14 @@ from src.common.logger import JSONFormatter, sanitize_log_record_data, setup_log
 
 def test_default_settings() -> None:
     """Test default values of application settings."""
-    settings = Settings()
+    settings = Settings(_env_file=None)
     assert settings.APP_NAME == "omniops-sre-agent"
     assert settings.ENV == "development"
     assert settings.LLM_MODEL_NAME == "Qwen/Qwen2.5-7B-Instruct-AWQ"
     assert settings.LLM_BASE_URL == "http://localhost:8000/v1"
     assert settings.MAX_AGENT_STEPS == 6
-    assert settings.MAX_AGENT_TOKENS == 4096
-    assert settings.MAX_TOKENS == 4096
+    assert settings.MAX_AGENT_TOKENS == 8192
+    assert settings.MAX_TOKENS == 8192
     assert settings.DATABASE_URL.startswith("postgresql+asyncpg://")
     assert settings.OMNIDOC_RAG_URL == "http://localhost:8080/api/v1/query"
 
@@ -36,12 +36,12 @@ def test_settings_env_override(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test overriding settings via environment variables."""
     monkeypatch.setenv("APP_NAME", "omniops-test")
     monkeypatch.setenv("MAX_AGENT_STEPS", "10")
-    monkeypatch.setenv("MAX_AGENT_TOKENS", "8192")
+    monkeypatch.setenv("MAX_AGENT_TOKENS", "16384")
     override_settings = Settings()
     assert override_settings.APP_NAME == "omniops-test"
     assert override_settings.MAX_AGENT_STEPS == 10
-    assert override_settings.MAX_AGENT_TOKENS == 8192
-    assert override_settings.MAX_TOKENS == 8192
+    assert override_settings.MAX_AGENT_TOKENS == 16384
+    assert override_settings.MAX_TOKENS == 16384
 
 
 def test_settings_singleton() -> None:
