@@ -1,4 +1,4 @@
-.PHONY: setup lint format typecheck test check-all
+.PHONY: setup lint format typecheck test eval-dry-run eval-compare run-api run-ui seed docker-up docker-down docker-ps check-all
 
 VENV = .venv
 BIN = $(VENV)/bin
@@ -12,19 +12,34 @@ setup:
 	$(BIN)/pip install -r requirements.txt
 
 lint:
-	$(BIN)/ruff check src tests evals
+	$(BIN)/ruff check src tests evals app.py main.py
 
 format:
-	$(BIN)/ruff format src tests evals
+	$(BIN)/ruff format src tests evals app.py main.py
 
 typecheck:
-	$(BIN)/mypy src
+	$(BIN)/mypy src evals app.py main.py
 
 test:
 	$(BIN)/pytest -v
 
+eval-dry-run:
+	$(BIN)/python -m evals.run_agent_benchmark --dry-run
+
+eval-compare:
+	$(BIN)/python -m evals.run_agent_benchmark --compare evals/results/eval_1_5b.json evals/results/eval_7b.json
+
+run-api:
+	$(BIN)/uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+run-ui:
+	$(BIN)/chainlit run app.py -w
+
+seed:
+	$(BIN)/python -m src.db.seed
+
 docker-up:
-	docker compose up -d postgres
+	docker compose up -d
 
 docker-down:
 	docker compose down
@@ -32,4 +47,4 @@ docker-down:
 docker-ps:
 	docker compose ps
 
-check-all: lint typecheck test
+check-all: lint typecheck test eval-dry-run

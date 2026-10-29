@@ -1,0 +1,61 @@
+name: CI Quality Gate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Lint, Typecheck & Tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: omniops
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Lint (Ruff)
+        run: |
+          ruff check src tests evals app.py main.py
+
+      - name: Format Check (Ruff)
+        run: |
+          ruff format --check src tests evals app.py main.py
+
+      - name: Static Type Check (Mypy)
+        run: |
+          mypy src evals app.py main.py
+
+      - name: Run Test Suite (Pytest)
+        env:
+          DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/omniops
+          SYNC_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/omniops
+        run: |
+          pytest -v
