@@ -101,7 +101,7 @@ _checkpoint_setup_done: bool = False
 async def postgres_graph() -> AsyncIterator[IncidentGraph]:
     """Open a PostgreSQL checkpoint store and yield the compiled incident graph."""
     global _checkpoint_setup_done
-    if sys.platform == 'win32':
+    if sys.platform == "win32":
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
     settings = get_settings()
     async with AsyncPostgresSaver.from_conn_string(settings.SYNC_DATABASE_URL) as checkpointer:
