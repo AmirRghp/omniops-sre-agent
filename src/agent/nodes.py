@@ -7,6 +7,7 @@ from typing import Any, cast
 
 from langchain_core.messages import AIMessage, ToolCall, ToolMessage
 from langchain_core.messages.utils import convert_to_openai_messages
+from langchain_core.runnables import RunnableConfig
 from openai import AsyncOpenAI
 from openai.types.chat import (
     ChatCompletionMessage,
@@ -174,6 +175,8 @@ async def agent_reasoning_node(state: IncidentState) -> dict[str, Any]:
     if pending_remediation is not None:
         update["pending_remediation"] = pending_remediation
         update["approval_status"] = "PENDING"
+        update["approved_by"] = None
+        update["approval_comment"] = None
 
     return update
 
@@ -252,18 +255,80 @@ async def read_tools_node(state: IncidentState) -> dict[str, Any]:
     return update
 
 
+async def remediation_node(state: IncidentState, config: RunnableConfig) -> dict[str, Any]:
+    """Execute or reject the pending remediation after the human approval gate."""
+    pending = state.get("pending_remediation")
+    if pending is None:
+        return {}
+
+    tool_call_id = pending["tool_call_id"]
+    approval_status = state.get("approval_status")
+
+    if approval_status == "APPROVED":
+        configurable = config.get("configurable", {})
+        thread_id = str(configurable.get("thread_id") or "unknown")
+        try:
+            result = await asyncio.wait_for(
+                tools.execute_remediation(
+                    service_name=pending["service_name"],
+                    action_type=pending["action_type"],
+                    parameters=pending["parameters"],
+                    idempotency_key=pending["idempotency_key"],
+                    reason=pending["reason"],
+                    thread_id=thread_id,
+                    approved_by=state.get("approved_by"),
+                ),
+                timeout=TOOL_TIMEOUT_SECONDS,
+            )
+        except TimeoutError:
+            logger.error("Remediation timed out after %.1fs", TOOL_TIMEOUT_SECONDS)
+            result = _tool_error(
+                "TOOL_TIMEOUT",
+                f"Remediation timed out after {TOOL_TIMEOUT_SECONDS:g} seconds.",
+            )
+        except Exception as exc:
+            logger.error("Remediation failed: %s", exc)
+            result = _tool_error("TOOL_EXECUTION_ERROR", f"Remediation failed: {exc}")
+    elif approval_status == "REJECTED":
+        result = {
+            "status": "REJECTED_BY_OPERATOR",
+            "reason": state.get("approval_comment") or "Rejected by operator.",
+        }
+    else:
+        result = _tool_error(
+            "APPROVAL_REQUIRED",
+            "Remediation requires an explicit human approval decision.",
+        )
+
+    return {
+        "messages": [
+            ToolMessage(
+                content=json.dumps(result, ensure_ascii=False, default=str),
+                tool_call_id=tool_call_id,
+                name="execute_remediation",
+            )
+        ],
+        "pending_remediation": None,
+    }
+
+
 async def force_terminate_node(state: IncidentState) -> dict[str, Any]:
-    """Stop the agent at the step ceiling and hand the incident to a human operator."""
-    max_steps = get_settings().MAX_AGENT_STEPS
+    """Stop the agent at a hard ceiling and hand the incident to a human operator."""
+    settings = get_settings()
     step_count = state.get("step_count", 0)
+    tokens_used = state.get("tokens_used", 0)
+    if tokens_used >= settings.MAX_AGENT_TOKENS:
+        budget = f"Token budget exhausted ({tokens_used}/{settings.MAX_AGENT_TOKENS})"
+    else:
+        budget = f"Step budget exhausted ({step_count}/{settings.MAX_AGENT_STEPS})"
+
     return {
         "messages": [
             AIMessage(
                 content=(
-                    f"Step budget exhausted ({step_count}/{max_steps}). "
-                    "Stopped before proposing or executing further actions. Review the "
-                    "collected tool outputs, confirm the root cause, and escalate to a "
-                    "human SRE for manual remediation."
+                    f"{budget}. Stopped before proposing or executing further actions. "
+                    "Review the collected tool outputs, confirm the root cause, and escalate "
+                    "to a human SRE for manual remediation."
                 )
             )
         ]

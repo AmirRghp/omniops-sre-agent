@@ -29,4 +29,6 @@ class IncidentState(TypedDict):
     tokens_used: int
     pending_remediation: PendingRemediation | None
     approval_status: ApprovalStatus | None
+    approved_by: str | None
+    approval_comment: str | None
     fallback_used: bool
