@@ -167,6 +167,15 @@ Starts or continues an incident investigation thread and streams SSE events (`to
     "thread_id": "inc_20261028_001"
   }
   ```
+- **Response:** `text/event-stream`, each frame written as `event: <name>` followed by `data: <json>`.
+  | Event | Data Payload |
+  | :--- | :--- |
+  | `tool_call` | `{"tool_call_id", "name", "arguments"}` |
+  | `tool_result` | `{"tool_call_id", "name", "result"}` where `result` is the tool's output schema |
+  | `token` | `{"content": "..."}` assistant text for the turn |
+  | `approval_required` | `{"thread_id", "pending_remediation": {"service_name", "action_type", "parameters", "idempotency_key", "reason"}, "message"}` |
+  | `done` | `{"thread_id", "status": "COMPLETED" \| "AWAITING_APPROVAL" \| "INTERRUPTED" \| "FAILED", "step_count", "tokens_used", "fallback_used"}` |
+- Posting a new query to a thread already paused at the HITL gate re-emits `approval_required` and does **not** run the agent; resolve it via 3.2 first.
 
 ### 3.2 `POST /api/v1/incident/approve`
 Resumes a paused LangGraph thread waiting at the Human-in-the-Loop interrupt gate.
@@ -179,6 +188,19 @@ Resumes a paused LangGraph thread waiting at the Human-in-the-Loop interrupt gat
     "comment": "Approved after verifying RB-104."
   }
   ```
+- **Response:**
+  ```json
+  {
+    "status": "success",
+    "thread_id": "inc_20261028_001",
+    "decision": "APPROVE",
+    "approval_status": "APPROVED",
+    "result": { "status": "success", "action_type": "increase_db_pool", "idempotent_replay": false },
+    "assistant_message": "Incident resolved after increasing the pool size."
+  }
+  ```
+- **Errors:** `422` for an unsupported `decision`, `404` when the thread has no remediation awaiting approval, `400` for any other resume failure.
 
 ### 3.3 `POST /api/v1/infra/reset`
 Resets PostgreSQL operational tables back to initial seed state (used between evaluation runs and demos).
+- **Response:** `{"status": "success", "message": "Operational tables reset to initial seed state."}`

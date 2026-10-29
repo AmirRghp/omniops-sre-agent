@@ -154,6 +154,14 @@ async def resume_with_approval(
         final_state.get("messages", []) if isinstance(final_state, dict) else []
     )
     result = _find_tool_result(messages, pending["tool_call_id"])
+    assistant_message = next(
+        (
+            message.content
+            for message in reversed(messages)
+            if isinstance(message, AIMessage) and isinstance(message.content, str)
+        ),
+        "",
+    )
     if result is None:
         return {
             "status": "error",
@@ -169,4 +177,5 @@ async def resume_with_approval(
         "decision": normalized_decision,
         "approval_status": approval_status,
         "result": result,
+        "assistant_message": assistant_message,
     }
