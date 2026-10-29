@@ -22,7 +22,7 @@ An AI agent with tool-calling capabilities introduces operational risks beyond s
 
 ## 4. Resource Exhaustion & Loop Ceilings
 - **Hard Step Ceiling (`MAX_STEPS = 6`):** Tracked in `IncidentState.step_count`. If the agent exceeds 6 reasoning loops, the conditional edge routes unconditionally to a termination summary node.
-- **Token Budget Ceiling (`MAX_TOKENS = 4096`):** Prevents runaway context accumulation.
+- **Token Budget Ceiling (`MAX_TOKENS = 8192`):** Prevents runaway context accumulation.
 - **Tool Execution Timeouts:** Every MCP tool execution is wrapped in `asyncio.wait_for(..., timeout=5.0)`.
 
 ---

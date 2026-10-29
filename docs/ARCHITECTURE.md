@@ -172,3 +172,14 @@ omniops-sre-agent/
 - **Context:** Read-only diagnostic tools (`get_service_health`, `query_incident_logs`, `search_runbooks`) should execute autonomously for speed, whereas `execute_remediation` modifies infrastructure state.
 - **Decision:** Route read-only tool calls to `read_tools_node` (auto-execution) and route `execute_remediation` calls to `remediation_node` configured with `interrupt_before=["remediation_node"]`.
 - **Consequence:** 100% deterministic enforcement of Human-in-the-Loop safety at the graph architecture level, not relying on prompt obedience.
+
+
+### ADR-004: Windows Selector Event Loop & Chainlit Data Layer Isolation
+- **Context:** On Windows hosts, the default \ProactorEventLoop\ causes \psycopg.InterfaceError\ inside \AsyncPostgresSaver\. Concurrently, Chainlit automatically creates an internal asyncpg pool if \DATABASE_URL\ is present in the environment, which fails when receiving an SQLAlchemy \postgresql+asyncpg://\ connection string.
+- **Decision:** Explicitly set \WindowsSelectorEventLoopPolicy\ in all async entrypoints (\pp.py\, \graph.py\, benchmark runner) and declare \@cl.data_layer\ returning \None\ in \pp.py\ since OmniOps manages durable checkpoints natively via LangGraph.
+- **Consequence:** Full cross-platform compatibility across Windows workstations, native Linux hosts, and Docker containers without configuration friction.
+
+### ADR-005: 8192 Token Context Ceiling & Multi-Level Remediation Action Extraction
+- **Context:** In multi-step incident investigations with dense log extracts and technical runbooks, prompt context can exceed 4096 tokens. Furthermore, models like Qwen 2.5 may output proposed remediation payloads directly inside markdown JSON blocks rather than invoking OpenAI function calls.
+- **Decision:** Increase \MAX_AGENT_TOKENS\ to 8192 (matching vLLM's \--max-model-len 8192\) and implement a recursive bracket-depth JSON parser (\_extract_json_objects\) in \src/agent/nodes.py\ to extract remediation actions from markdown text and wrap them into \execute_remediation\ tool calls.
+- **Consequence:** Eliminates premature token ceiling terminations and ensures 100% interception at the human approval gate even when actions are proposed via text blocks.

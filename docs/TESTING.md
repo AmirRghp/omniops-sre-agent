@@ -31,12 +31,13 @@ A core portfolio highlight of this repository is running `evals/run_agent_benchm
 ## 4. Test Commands
 ```bash
 # Tier 1: Fast Unit Tests (No GPU / No LLM required)
-pytest tests/unit -v
+pytest tests/ -v  # 110 automated unit & integration tests
 
 # Tier 2: Graph & API Integration Tests
 pytest tests/integration -v
 
 # Tier 3: Live Agent Evaluation Suite (Requires vLLM & Postgres)
+python -m evals.run_agent_benchmark --dry-run
 python -m evals.run_agent_benchmark --model Qwen/Qwen2.5-7B-Instruct-AWQ --output evals/results/eval_7b.json
 python -m evals.run_agent_benchmark --model Qwen/Qwen2.5-1.5B-Instruct-AWQ --output evals/results/eval_1_5b.json
 ```
