@@ -1,0 +1,17 @@
+app:
+  name: "omniops-sre-agent"
+  version: "0.1.0"
+  env: "development"
+
+agent:
+  max_steps: 6
+  max_tokens: 4096
+  timeout_seconds: 60.0
+
+circuit_breaker:
+  request_timeout_seconds: 1.5
+  failure_threshold: 3
+  recovery_timeout_seconds: 30.0
+
+tools:
+  execution_timeout_seconds: 5.0
