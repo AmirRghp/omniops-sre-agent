@@ -5,6 +5,7 @@ from decimal import Decimal
 
 import pytest
 from sqlalchemy import select
+from sqlalchemy.exc import DBAPIError, IntegrityError
 
 from src.db.models import IncidentLog, InfraService, RemediationExecution
 from src.db.session import init_db, session_scope
@@ -119,3 +120,83 @@ async def test_session_rollback_on_exception() -> None:
     async with session_scope() as session:
         svc = await session.get(InfraService, "rollback-svc")
         assert svc is None
+
+
+@pytest.mark.asyncio
+async def test_database_check_constraints_and_idempotency_unique() -> None:
+    """Test that check constraints and unique constraints reject invalid data."""
+    await init_db()
+
+    # 1. Invalid status check constraint violation
+    with pytest.raises((IntegrityError, DBAPIError)):
+        async with session_scope() as session:
+            invalid_svc = InfraService(
+                service_name="invalid-status-svc",
+                status="INVALID_STATUS",  # Not in ('HEALTHY', 'DEGRADED', 'CRITICAL', 'RESTARTING')
+                cpu_usage_pct=Decimal("50.00"),
+                memory_usage_mb=512,
+                memory_limit_mb=1024,
+                p95_latency_ms=100,
+                active_replicas=1,
+                max_replicas=2,
+            )
+            session.add(invalid_svc)
+
+    # 2. Duplicate idempotency key unique constraint violation
+    unique_key = f"idem_dup_{uuid.uuid4().hex[:8]}"
+
+    # Clean up test service if present
+    async with session_scope() as session:
+        existing = await session.get(InfraService, "test-dup-svc")
+        if existing:
+            await session.delete(existing)
+            await session.flush()
+
+        test_svc = InfraService(
+            service_name="test-dup-svc",
+            status="HEALTHY",
+            cpu_usage_pct=Decimal("20.00"),
+            memory_usage_mb=512,
+            memory_limit_mb=1024,
+            p95_latency_ms=60,
+            active_replicas=1,
+            max_replicas=2,
+        )
+        session.add(test_svc)
+        rem1 = RemediationExecution(
+            idempotency_key=unique_key,
+            thread_id="th_dup_001",
+            service_name="test-dup-svc",
+            action_type="restart_service",
+            parameters={},
+            reason="Initial execution",
+            approval_status="APPROVED",
+        )
+        session.add(rem1)
+
+    # Attempt to insert identical idempotency key
+    with pytest.raises((IntegrityError, DBAPIError)):
+        async with session_scope() as session:
+            rem2 = RemediationExecution(
+                idempotency_key=unique_key,  # Duplicate!
+                thread_id="th_dup_002",
+                service_name="test-dup-svc",
+                action_type="restart_service",
+                parameters={},
+                reason="Duplicate replay attempt",
+                approval_status="APPROVED",
+            )
+            session.add(rem2)
+
+    # Clean up
+    async with session_scope() as session:
+        cleanup_svc = await session.get(InfraService, "test-dup-svc")
+        if cleanup_svc:
+            rem_stmt = select(RemediationExecution).where(
+                RemediationExecution.service_name == "test-dup-svc"
+            )
+            rems = (await session.execute(rem_stmt)).scalars().all()
+            for r in rems:
+                await session.delete(r)
+            await session.flush()
+            await session.delete(cleanup_svc)
