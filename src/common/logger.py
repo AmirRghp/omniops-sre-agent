@@ -112,7 +112,8 @@ def setup_logger(
 
     # Avoid duplicate handlers if already configured
     if not logger.handlers:
-        handler = logging.StreamHandler(sys.stdout)
+        # stdout is reserved for stdio MCP JSON-RPC frames; logs must go to stderr.
+        handler = logging.StreamHandler(sys.stderr)
         handler.setLevel(level.upper())
 
         if json_format:
