@@ -40,11 +40,18 @@ def route_after_reasoning(state: IncidentState) -> str:
         return END
 
     tool_names = {call["name"] for call in last_message.tool_calls}
-    if "execute_remediation" in tool_names:
-        return "remediation_node"
     if tool_names & READ_ONLY_TOOLS:
         return "read_tools_node"
+    if "execute_remediation" in tool_names:
+        return "remediation_node"
     return END
+
+
+def route_after_read_tools(state: IncidentState) -> str:
+    """Route to remediation_node if a pending remediation was queued alongside read tools."""
+    if state.get("pending_remediation") is not None:
+        return "remediation_node"
+    return "agent_reasoning"
 
 
 def build_incident_graph(
@@ -68,7 +75,14 @@ def build_incident_graph(
             END: END,
         },
     )
-    builder.add_edge("read_tools_node", "agent_reasoning")
+    builder.add_conditional_edges(
+        "read_tools_node",
+        route_after_read_tools,
+        {
+            "remediation_node": "remediation_node",
+            "agent_reasoning": "agent_reasoning",
+        },
+    )
     builder.add_edge("remediation_node", "agent_reasoning")
     builder.add_edge("force_terminate", END)
 
@@ -78,12 +92,18 @@ def build_incident_graph(
     )
 
 
+_checkpoint_setup_done: bool = False
+
+
 @asynccontextmanager
 async def postgres_graph() -> AsyncIterator[IncidentGraph]:
     """Open a PostgreSQL checkpoint store and yield the compiled incident graph."""
+    global _checkpoint_setup_done
     settings = get_settings()
     async with AsyncPostgresSaver.from_conn_string(settings.SYNC_DATABASE_URL) as checkpointer:
-        await checkpointer.setup()
+        if not _checkpoint_setup_done:
+            await checkpointer.setup()
+            _checkpoint_setup_done = True
         yield build_incident_graph(checkpointer)
 
 

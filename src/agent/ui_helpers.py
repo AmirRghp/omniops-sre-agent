@@ -51,7 +51,7 @@ def format_approval_card(pending: Mapping[str, Any] | PendingRemediation) -> str
     action_type = pending.get("action_type", "unknown")
     parameters = pending.get("parameters", {})
     idempotency_key = pending.get("idempotency_key", "")
-    reason = pending.get("reason", "")
+    reason = str(pending.get("reason", "")).replace("|", "\\|").replace("\n", " ")
 
     params_json = json.dumps(parameters, indent=2, ensure_ascii=False)
 
@@ -60,7 +60,7 @@ def format_approval_card(pending: Mapping[str, Any] | PendingRemediation) -> str
 ### ⚠️ نیاز به تایید اپراتور (Human Approval Required)
 
 > **هشدار ایمنی:** عامل هوشمند قصد اعمال تغییر در وضعیت زیرساخت را دارد.
-> این عملیات در مرحله گیت نظارتی متوقف شده است. لطفاً جزئیات را بازبینی کرده و تصمیم نگیرید.
+> این عملیات در مرحله گیت نظارتی متوقف شده است. لطفاً جزئیات را بازبینی کرده و تصمیم بگیرید.
 
 | مشخصه / فیلد | مقدار مشخصه |
 | :--- | :--- |

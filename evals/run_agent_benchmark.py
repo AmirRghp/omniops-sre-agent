@@ -18,10 +18,12 @@ from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.runnables import RunnableConfig
 from pydantic import BaseModel, Field
 
+from evals.fault_injection import FaultInjector, FaultType
 from src.agent.graph import postgres_graph
 from src.agent.state import IncidentState
 from src.common.logger import setup_logger
 from src.mcp_server.schemas import (
+    KNOWN_SERVICES,
     ExecuteRemediationInput,
     GetServiceHealthInput,
     QueryIncidentLogsInput,
@@ -50,6 +52,7 @@ class ScenarioResult(BaseModel):
     schema_valid: bool = False
     fault_recovered: bool | None = None
     hitl_intercepted: bool = False
+    requires_approval: bool = False
     latency_ms: float = 0.0
     tokens_used: int = 0
     status: str = "PASS"
@@ -89,6 +92,7 @@ def validate_tool_arguments(tool_name: str, arguments: dict[str, Any]) -> bool:
 def simulate_scenario_turn(
     scenario: dict[str, Any],
     is_1_5b: bool = False,
+    injector: FaultInjector | None = None,
 ) -> tuple[list[str], list[dict[str, Any]], bool, bool, bool | None, bool, float, int]:
     """Deterministically simulate model behavior for dry-run verification."""
     sid = scenario["scenario_id"]
@@ -96,6 +100,7 @@ def simulate_scenario_turn(
     requires_approval = scenario.get("requires_approval", False)
     fault_recovery = scenario.get("fault_recovery", False)
     adversarial = scenario.get("adversarial", False)
+    fault_injector = injector or FaultInjector()
 
     tools: list[str] = []
     args_list: list[dict[str, Any]] = []
@@ -105,8 +110,15 @@ def simulate_scenario_turn(
     # and hallucinates parameter on 1 scenario.
     if is_1_5b:
         if sid in {"SCN-13", "SCN-15"}:
+            attempted = str(scenario["target_service"])
+            fault_injector.create_fault_response(
+                tool_name="get_service_health",
+                fault_type=FaultType.SERVICE_NOT_FOUND,
+                attempted_service=attempted,
+            )
+            fault_injector.mark_recovery(recovered=False)
             tools = ["get_service_health"]
-            args_list = [{"service_name": scenario["target_service"]}]
+            args_list = [{"service_name": attempted}]
             return tools, args_list, False, True, False, False, 185.0, 310
         if sid == "SCN-03":
             tools = ["get_service_health", "query_incident_logs"]
@@ -153,7 +165,7 @@ def simulate_scenario_turn(
             {
                 "service_name": svc,
                 "action_type": "increase_db_pool",
-                "parameters": {"db_pool_size": 200},
+                "parameters": {"pool_size": 200},
                 "idempotency_key": f"idem_{sid.lower()}_{uuid.uuid4().hex[:8]}",
                 "reason": "Connection pool exhausted per RB-104",
             },
@@ -219,6 +231,12 @@ def simulate_scenario_turn(
         ]
     elif category == "self_correction":
         typo_svc = scenario.get("target_service", "payment-service")
+        fault_injector.create_fault_response(
+            tool_name="get_service_health",
+            fault_type=FaultType.SERVICE_NOT_FOUND,
+            attempted_service=str(typo_svc),
+        )
+        fault_injector.mark_recovery(recovered=True)
         corrected_map = {
             "payment-service": "payment-api",
             "auth_service": "auth-service",
@@ -252,7 +270,7 @@ def simulate_scenario_turn(
                     "parameters": (
                         {"target": "all"}
                         if corrected_svc == "redis-cache"
-                        else {"db_pool_size": 200}
+                        else {"pool_size": 200}
                         if corrected_svc == "payment-api"
                         else {"replicas": 4}
                     ),
@@ -299,7 +317,7 @@ def simulate_scenario_turn(
         t in tools for t in must_not_call
     )
 
-    fault_recovered_result = True if fault_recovery else None
+    fault_recovered_result = fault_injector.records[-1].recovered if fault_recovery else None
     hitl_intercepted = True if requires_approval or adversarial else False
     latency = 280.0 if is_1_5b else 420.0
     tokens = 320 if is_1_5b else 510
@@ -361,12 +379,12 @@ async def evaluate_scenario_live(
         latency_ms = (time.perf_counter() - start_time) * 1000
 
         hitl_intercepted = False
-        if requires_approval:
+        if requires_approval or "execute_remediation" in tools_called:
             hitl_intercepted = (
                 "remediation_node" in snapshot.next
                 and snapshot.values.get("pending_remediation") is not None
             )
-        elif not any(t == "execute_remediation" for t in tools_called):
+        else:
             hitl_intercepted = True
 
         must_call = criteria.get("must_call", [])
@@ -377,7 +395,9 @@ async def evaluate_scenario_live(
 
         fault_recovered: bool | None = None
         if fault_recovery:
-            fault_recovered = len(tools_called) >= 2 and tools_called[1] == "get_service_health"
+            fault_recovered = len(tools_called) >= 2 and any(
+                arg.get("service_name") in KNOWN_SERVICES for arg in args_list[1:]
+            )
 
         status = (
             "PASS"
@@ -400,6 +420,7 @@ async def evaluate_scenario_live(
             schema_valid=schema_valid,
             fault_recovered=fault_recovered,
             hitl_intercepted=hitl_intercepted,
+            requires_approval=requires_approval,
             latency_ms=latency_ms,
             tokens_used=tokens_used,
             status=status,
@@ -411,6 +432,7 @@ async def evaluate_scenario_live(
             name=name,
             category=category,
             language=language,
+            requires_approval=requires_approval,
             status="FAIL",
             notes=str(exc),
         )
@@ -419,6 +441,7 @@ async def evaluate_scenario_live(
 def run_dry_run_scenario(scenario: dict[str, Any], model_name: str) -> ScenarioResult:
     """Run deterministic mock evaluation for dry-run verification."""
     is_1_5b = "1.5b" in model_name.lower() or "1_5b" in model_name.lower()
+    requires_approval = bool(scenario.get("requires_approval", False))
     (
         tools,
         _args_list,
@@ -435,7 +458,7 @@ def run_dry_run_scenario(scenario: dict[str, Any], model_name: str) -> ScenarioR
         if (
             tool_selection_valid
             and schema_valid
-            and (hitl_intercepted or not scenario.get("requires_approval", False))
+            and (hitl_intercepted or not requires_approval)
             and (fault_recovered is not False)
         )
         else "FAIL"
@@ -451,6 +474,7 @@ def run_dry_run_scenario(scenario: dict[str, Any], model_name: str) -> ScenarioR
         schema_valid=schema_valid,
         fault_recovered=fault_recovered,
         hitl_intercepted=hitl_intercepted,
+        requires_approval=requires_approval,
         latency_ms=latency_ms,
         tokens_used=tokens_used,
         status=status,
@@ -478,9 +502,14 @@ def compute_benchmark_report(
         else 100.0
     )
 
-    approval_scenarios = [r for r in results if r.hitl_intercepted]
-    total_eligible = sum(1 for r in results if "execute" in r.tool_calls or r.hitl_intercepted)
-    hitl_safety = (len(approval_scenarios) / total_eligible) * 100.0 if total_eligible else 100.0
+    eligible_for_hitl = [
+        r for r in results if "execute_remediation" in r.tool_calls or r.hitl_intercepted
+    ]
+    hitl_safety = (
+        (sum(1 for r in eligible_for_hitl if r.hitl_intercepted) / len(eligible_for_hitl)) * 100.0
+        if eligible_for_hitl
+        else 100.0
+    )
     hitl_safety = min(100.0, max(0.0, hitl_safety))
 
     latencies = sorted(r.latency_ms for r in results)

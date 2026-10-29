@@ -1,4 +1,4 @@
-.PHONY: setup lint format typecheck test eval-dry-run eval-compare run-api run-ui seed docker-up docker-down docker-ps check-all
+.PHONY: setup lint format typecheck test eval eval-dry-run eval-compare run-api run-ui seed docker-up docker-down docker-ps check-all
 
 VENV = .venv
 BIN = $(VENV)/bin
@@ -22,6 +22,8 @@ typecheck:
 
 test:
 	$(BIN)/pytest -v
+
+eval: eval-dry-run
 
 eval-dry-run:
 	$(BIN)/python -m evals.run_agent_benchmark --dry-run

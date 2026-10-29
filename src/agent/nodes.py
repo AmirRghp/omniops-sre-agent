@@ -31,7 +31,18 @@ from src.mcp_server.schemas import (
 logger = setup_logger("agent_nodes")
 
 READ_ONLY_TOOLS = frozenset({"search_runbooks", "query_incident_logs", "get_service_health"})
-TOOL_TIMEOUT_SECONDS = 5.0
+
+
+def _load_tool_timeout() -> float:
+    """Read tool execution timeout from configs/config.yaml with a safe default."""
+    try:
+        cfg = load_yaml_config("configs/config.yaml")
+        return float(cfg.get("tools", {}).get("execution_timeout_seconds", 5.0))
+    except Exception:
+        return 5.0
+
+
+TOOL_TIMEOUT_SECONDS = _load_tool_timeout()
 
 
 def _tool_definition(
@@ -214,7 +225,10 @@ async def _run_read_tool_call(call: ToolCall) -> tuple[ToolMessage, dict[str, An
         )
     except Exception as exc:
         logger.error("Read tool %s failed: %s", name, exc)
-        result = _tool_error("TOOL_EXECUTION_ERROR", f"Tool '{name}' failed: {exc}")
+        result = _tool_error(
+            "TOOL_EXECUTION_ERROR",
+            f"Tool '{name}' encountered an internal execution error.",
+        )
 
     return (
         ToolMessage(
@@ -288,7 +302,10 @@ async def remediation_node(state: IncidentState, config: RunnableConfig) -> dict
             )
         except Exception as exc:
             logger.error("Remediation failed: %s", exc)
-            result = _tool_error("TOOL_EXECUTION_ERROR", f"Remediation failed: {exc}")
+            result = _tool_error(
+                "TOOL_EXECUTION_ERROR",
+                "Remediation encountered an internal execution error.",
+            )
     elif approval_status == "REJECTED":
         result = {
             "status": "REJECTED_BY_OPERATOR",

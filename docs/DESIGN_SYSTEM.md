@@ -65,7 +65,7 @@
 - **Metadata Table:**
   - **Target Service:** Monospace badge (e.g., `payment-api`)
   - **Proposed Action:** Monospace badge (e.g., `increase_db_pool`)
-  - **Parameters:** `{"new_pool_size": 50}`
+  - **Parameters:** `{"pool_size": 200}`
   - **Idempotency Key:** `idem_9f8a7d6c`
   - **Justification:** Clear explanation grounded in retrieved logs and runbooks.
 - **Action Buttons:**

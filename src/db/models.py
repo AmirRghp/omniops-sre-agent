@@ -124,7 +124,7 @@ class RemediationExecution(Base):
     thread_id: Mapped[str] = mapped_column(String(128), nullable=False)
     service_name: Mapped[str] = mapped_column(
         String(64),
-        ForeignKey("infra_services.service_name"),
+        ForeignKey("infra_services.service_name", ondelete="CASCADE"),
         nullable=False,
     )
     action_type: Mapped[str] = mapped_column(String(64), nullable=False)

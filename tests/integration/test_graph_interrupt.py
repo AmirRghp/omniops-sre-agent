@@ -226,3 +226,78 @@ async def test_resume_rejects_invalid_decision() -> None:
     assert outcome["status"] == "error"
     assert outcome["error_code"] == "INVALID_DECISION"
     assert outcome["valid_decisions"] == ["APPROVE", "REJECT"]
+
+
+@pytest.mark.asyncio
+async def test_force_terminate_when_step_limit_reached(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Verify the graph routes to force_terminate when step_count reaches MAX_AGENT_STEPS."""
+    thread_id = f"inc_limit_{uuid.uuid4().hex}"
+    read_call = SimpleNamespace(
+        type="function",
+        id="call_health_loop",
+        function=SimpleNamespace(
+            name="get_service_health",
+            arguments=json.dumps({"service_name": "payment-api"}),
+        ),
+    )
+    script = _ScriptedClient([_completion("Checking again.", [read_call])])
+    monkeypatch.setattr(nodes, "_get_llm_client", lambda: script)
+
+    state = _initial_state()
+    state["step_count"] = 5  # Next reasoning turn increments to 6 (MAX_AGENT_STEPS)
+
+    async with postgres_graph() as graph:
+        final_state = await graph.ainvoke(state, _config(thread_id))
+
+    messages = final_state["messages"]
+    assert "Step budget exhausted (6/6)" in messages[-1].content
+
+
+@pytest.mark.asyncio
+async def test_mixed_read_and_write_tool_calls_execute_reads_before_interrupt(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Verify mixed read+write tool calls answer read ToolMessages before pausing at HITL gate."""
+    thread_id = f"inc_mixed_{uuid.uuid4().hex}"
+    idempotency_key = f"idem_mixed_{uuid.uuid4().hex[:12]}"
+    read_call = SimpleNamespace(
+        type="function",
+        id="call_read_mixed",
+        function=SimpleNamespace(
+            name="get_service_health",
+            arguments=json.dumps({"service_name": "payment-api"}),
+        ),
+    )
+    write_call = SimpleNamespace(
+        type="function",
+        id="call_write_mixed",
+        function=SimpleNamespace(
+            name="execute_remediation",
+            arguments=json.dumps(
+                {
+                    "service_name": "payment-api",
+                    "action_type": "increase_db_pool",
+                    "parameters": {"pool_size": 200},
+                    "idempotency_key": idempotency_key,
+                    "reason": "Mixed turn test",
+                }
+            ),
+        ),
+    )
+    script = _ScriptedClient(
+        [_completion("Reading and proposing remediation.", [read_call, write_call])]
+    )
+    monkeypatch.setattr(nodes, "_get_llm_client", lambda: script)
+    config = _config(thread_id)
+
+    async with postgres_graph() as graph:
+        await graph.ainvoke(_initial_state(), config)
+        snapshot = await graph.aget_state(config)
+
+    assert snapshot.next == ("remediation_node",)
+    assert any(
+        isinstance(m, ToolMessage) and m.tool_call_id == "call_read_mixed"
+        for m in snapshot.values["messages"]
+    )

@@ -159,3 +159,32 @@ def test_generate_markdown_report_and_comparison() -> None:
     assert "SRE Agent Model Comparison" in comparison
     assert "1.5B" in comparison
     assert "7B" in comparison
+
+
+def test_hitl_interception_rate_detects_unintercepted_write() -> None:
+    r_safe = ScenarioResult(
+        scenario_id="SCN-01",
+        name="Safe Intercept",
+        category="db_pool_exhaustion",
+        language="fa",
+        tool_calls=["get_service_health", "execute_remediation"],
+        tool_selection_valid=True,
+        schema_valid=True,
+        hitl_intercepted=True,
+        requires_approval=True,
+        status="PASS",
+    )
+    r_missed = ScenarioResult(
+        scenario_id="SCN-02",
+        name="Missed Intercept",
+        category="redis_oom",
+        language="en",
+        tool_calls=["get_service_health", "execute_remediation"],
+        tool_selection_valid=True,
+        schema_valid=True,
+        hitl_intercepted=False,
+        requires_approval=True,
+        status="FAIL",
+    )
+    report = compute_benchmark_report("test-model", [r_safe, r_missed], dry_run=True)
+    assert report.hitl_interception_rate == 50.0

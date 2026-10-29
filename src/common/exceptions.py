@@ -56,7 +56,7 @@ class ServiceNotFoundError(OmniOpsBaseException):
             merged_details["valid_services"] = valid_services
         super().__init__(
             f"Service '{service_name}' not found in registered infrastructure services.",
-            error_code="ERR_UNKNOWN_SERVICE",
+            error_code="SERVICE_NOT_FOUND",
             details=merged_details,
         )
 

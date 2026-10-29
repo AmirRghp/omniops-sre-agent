@@ -63,7 +63,7 @@ CREATE TABLE remediation_executions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     idempotency_key VARCHAR(128) UNIQUE NOT NULL,
     thread_id VARCHAR(128) NOT NULL,
-    service_name VARCHAR(64) NOT NULL REFERENCES infra_services(service_name),
+    service_name VARCHAR(64) NOT NULL REFERENCES infra_services(service_name) ON DELETE CASCADE,
     action_type VARCHAR(64) NOT NULL CHECK (action_type IN ('restart_service', 'scale_replicas', 'flush_redis_cache', 'increase_db_pool')),
     parameters JSONB NOT NULL DEFAULT '{}'::jsonb,
     reason TEXT NOT NULL,

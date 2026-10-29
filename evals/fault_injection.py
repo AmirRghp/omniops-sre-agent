@@ -5,13 +5,9 @@ from typing import Any
 
 from pydantic import BaseModel
 
-VALID_SERVICES: list[str] = [
-    "payment-api",
-    "auth-service",
-    "postgres-primary",
-    "redis-cache",
-    "nginx-ingress",
-]
+from src.mcp_server.schemas import KNOWN_SERVICES
+
+VALID_SERVICES: list[str] = list(KNOWN_SERVICES)
 
 
 class FaultType(StrEnum):

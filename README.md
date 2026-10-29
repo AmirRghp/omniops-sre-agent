@@ -3,8 +3,8 @@
 > **Autonomous Incident Response & Model Context Protocol (MCP) Platform**
 > *Project 2 of the AI Engineering Roadmap — Built for Autonomous Triage, Deterministic MCP Tooling, and Human-in-the-Loop Infrastructure Safety.*
 
-[![CI Quality Gate](https://github.com/amirreza/omniops-sre-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/amirreza/omniops-sre-agent/actions/workflows/ci.yml)
-[![Deterministic Benchmark](https://github.com/amirreza/omniops-sre-agent/actions/workflows/agent-evals.yml/badge.svg)](https://github.com/amirreza/omniops-sre-agent/actions/workflows/agent-evals.yml)
+[![CI Quality Gate](https://github.com/AmirRghp/omniops-sre-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/AmirRghp/omniops-sre-agent/actions/workflows/ci.yml)
+[![Deterministic Benchmark](https://github.com/AmirRghp/omniops-sre-agent/actions/workflows/agent-evals.yml/badge.svg)](https://github.com/AmirRghp/omniops-sre-agent/actions/workflows/agent-evals.yml)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![FastMCP](https://img.shields.io/badge/MCP-FastMCP%20SDK-purple.svg)](https://modelcontextprotocol.io/)
 [![LangGraph](https://img.shields.io/badge/Orchestration-LangGraph%20AsyncPostgres-orange.svg)](https://langchain-ai.github.io/langgraph/)
@@ -109,7 +109,7 @@ docker compose up -d
 ### Option B: Local Development Setup
 ```bash
 # 1. Clone repository & setup virtual environment
-git clone https://github.com/amirreza/omniops-sre-agent.git
+git clone https://github.com/AmirRghp/omniops-sre-agent.git
 cd omniops-sre-agent
 make setup
 

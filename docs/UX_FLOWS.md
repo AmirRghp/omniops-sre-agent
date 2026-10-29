@@ -76,7 +76,7 @@ This document traces the interactive user and system flows across the OmniOps SR
        ▼
 [MCP Tool Validation catches mismatch (No raw exception thrown)]
        └── Returns Structured Error JSON:
-           `{"status": "error", "code": "SERVICE_NOT_FOUND", "message": "Service 'payment-service' does not exist.", "valid_services": ["payment-api", "auth-service", "postgres-primary", "redis-cache", "nginx-ingress"]}`
+           `{"status": "error", "error_code": "SERVICE_NOT_FOUND", "message": "Service 'payment-service' does not exist.", "valid_services": ["payment-api", "auth-service", "postgres-primary", "redis-cache", "nginx-ingress"]}`
        │
        ▼
 [UI Step Badge shows Amber Warning: "Tool returned SERVICE_NOT_FOUND -> Agent self-correcting..."]

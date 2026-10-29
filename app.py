@@ -3,7 +3,7 @@
 import json
 import time
 import uuid
-from typing import Any, cast
+from typing import Any, Literal, cast
 
 import chainlit as cl
 from chainlit.config import config as cl_config
@@ -27,6 +27,35 @@ cl_config.ui.name = "OmniOps SRE Agent"
 cl_config.ui.default_theme = "dark"
 cl_config.ui.custom_css = "/public/custom.css"
 cl_config.ui.cot = "full"
+
+
+async def _send_approval_card(thread_id: str, pending: dict[str, Any]) -> None:
+    """Render the interactive HITL approval card and action buttons."""
+    card_md = format_approval_card(pending)
+    actions = [
+        cl.Action(
+            name="approve_action",
+            label="✅ تایید و اجرا (Approve)",
+            payload={
+                "thread_id": thread_id,
+                "decision": "APPROVE",
+                "service_name": pending["service_name"],
+                "action_type": pending["action_type"],
+                "parameters": pending["parameters"],
+            },
+        ),
+        cl.Action(
+            name="reject_action",
+            label="❌ لغو عملیات (Reject)",
+            payload={
+                "thread_id": thread_id,
+                "decision": "REJECT",
+                "service_name": pending["service_name"],
+                "action_type": pending["action_type"],
+            },
+        ),
+    ]
+    await cl.Message(content=card_md, actions=actions).send()  # type: ignore[no-untyped-call]
 
 
 @cl.on_chat_start
@@ -54,6 +83,12 @@ async def on_message(message: cl.Message) -> None:
 
     try:
         async with postgres_graph() as graph:
+            existing_snapshot = await graph.aget_state(config)
+            existing_pending = existing_snapshot.values.get("pending_remediation")
+            if "remediation_node" in existing_snapshot.next and existing_pending is not None:
+                await _send_approval_card(thread_id, existing_pending)
+                return
+
             async for chunk in graph.astream(new_turn, config, stream_mode="updates"):
                 for node_name, update in chunk.items():
                     if not isinstance(update, dict):
@@ -119,59 +154,44 @@ async def on_message(message: cl.Message) -> None:
 
         pending = snapshot.values.get("pending_remediation")
         if "remediation_node" in snapshot.next and pending is not None:
-            card_md = format_approval_card(pending)
-            actions = [
-                cl.Action(
-                    name="approve_action",
-                    label="✅ تایید و اجرا (Approve)",
-                    payload={
-                        "thread_id": thread_id,
-                        "decision": "APPROVE",
-                        "service_name": pending["service_name"],
-                        "action_type": pending["action_type"],
-                        "parameters": pending["parameters"],
-                    },
-                ),
-                cl.Action(
-                    name="reject_action",
-                    label="❌ لغو عملیات (Reject)",
-                    payload={
-                        "thread_id": thread_id,
-                        "decision": "REJECT",
-                        "service_name": pending["service_name"],
-                        "action_type": pending["action_type"],
-                    },
-                ),
-            ]
-            await cl.Message(content=card_md, actions=actions).send()  # type: ignore[no-untyped-call]
+            await _send_approval_card(thread_id, pending)
         elif final_content:
             await cl.Message(content=final_content).send()  # type: ignore[no-untyped-call]
 
     except Exception as exc:
         logger.exception("Incident investigation failed: %s", exc)
         await cl.Message(  # type: ignore[no-untyped-call]
-            content=f"⚠️ **خطا در پردازش حادثه:**\n\n```\n{exc}\n```\n\n"
-            "لطفاً از فعال بودن پایگاه داده و در دسترس بودن سرور مدل اطمینان حاصل فرمایید."
+            content="⚠️ **خطا در پردازش حادثه:**\n\n"
+            "ارتباط با سرویس استنتاج مدل یا پایگاه داده با اشکال مواجه شد. "
+            "لطفاً وضعیت سرویس‌ها را بررسی کرده و مجدداً تلاش فرمایید."
         ).send()
 
 
-@cl.action_callback("approve_action")
-async def on_approve(action: cl.Action) -> None:
-    """Handle explicit human approval to execute the pending remediation."""
+async def _handle_operator_decision(
+    action: cl.Action,
+    decision: Literal["APPROVE", "REJECT"],
+) -> None:
+    """Shared handler for operator approval or rejection callbacks."""
     payload = action.payload or {}
-    thread_id = str(payload.get("thread_id") or cl.user_session.get("thread_id") or "")  # type: ignore[no-untyped-call]
+    session_tid = cl.user_session.get("thread_id")  # type: ignore[no-untyped-call]
+    thread_id = str(payload.get("thread_id") or session_tid or "")
     service_name = str(payload.get("service_name", "service"))
     action_type = str(payload.get("action_type", "remediation"))
     parameters = payload.get("parameters", {})
 
     await action.remove()  # type: ignore[no-untyped-call]
 
+    comment = (
+        "Approved via Chainlit SRE Console"
+        if decision == "APPROVE"
+        else "Rejected via Chainlit SRE Console"
+    )
     start_time = time.perf_counter()
     outcome = await resume_with_approval(
         thread_id=thread_id,
-        decision="APPROVE",
+        decision=decision,
         operator_id="sre_console_operator",
-        comment="Approved via Chainlit SRE Console",
+        comment=comment,
     )
     duration_ms = (time.perf_counter() - start_time) * 1000
 
@@ -180,18 +200,19 @@ async def on_approve(action: cl.Action) -> None:
         tool_name="execute_remediation",
         duration_ms=duration_ms,
         source_mode=None,
-        is_error=outcome.get("status") == "error",
+        is_error=decision == "APPROVE" and outcome.get("status") == "error",
     )
     step = cl.Step(name=step_title, type="tool")
-    step.input = json.dumps(
-        {
-            "service_name": service_name,
-            "action_type": action_type,
-            "parameters": parameters,
-        },
-        indent=2,
-        ensure_ascii=False,
-    )
+    step_input: dict[str, Any] = {
+        "service_name": service_name,
+        "action_type": action_type,
+    }
+    if decision == "APPROVE":
+        step_input["parameters"] = parameters
+    else:
+        step_input["status"] = "ABORTED_BY_OPERATOR"
+
+    step.input = json.dumps(step_input, indent=2, ensure_ascii=False)
     step.output = json.dumps(result, indent=2, ensure_ascii=False)
     await step.send()  # type: ignore[no-untyped-call]
 
@@ -199,50 +220,18 @@ async def on_approve(action: cl.Action) -> None:
     if assistant_msg:
         await cl.Message(content=assistant_msg).send()  # type: ignore[no-untyped-call]
     else:
-        await cl.Message(content=format_remediation_summary(result, "APPROVED")).send()  # type: ignore[no-untyped-call]
+        status_label = "APPROVED" if decision == "APPROVE" else "REJECTED"
+        summary_md = format_remediation_summary(result, status_label)
+        await cl.Message(content=summary_md).send()  # type: ignore[no-untyped-call]
+
+
+@cl.action_callback("approve_action")
+async def on_approve(action: cl.Action) -> None:
+    """Handle explicit human approval to execute the pending remediation."""
+    await _handle_operator_decision(action, "APPROVE")
 
 
 @cl.action_callback("reject_action")
 async def on_reject(action: cl.Action) -> None:
     """Handle operator rejection to abort the pending remediation safely."""
-    payload = action.payload or {}
-    thread_id = str(payload.get("thread_id") or cl.user_session.get("thread_id") or "")  # type: ignore[no-untyped-call]
-    service_name = str(payload.get("service_name", "service"))
-    action_type = str(payload.get("action_type", "remediation"))
-
-    await action.remove()  # type: ignore[no-untyped-call]
-
-    start_time = time.perf_counter()
-    outcome = await resume_with_approval(
-        thread_id=thread_id,
-        decision="REJECT",
-        operator_id="sre_console_operator",
-        comment="Rejected via Chainlit SRE Console",
-    )
-    duration_ms = (time.perf_counter() - start_time) * 1000
-
-    result = outcome.get("result", {})
-    step_title = format_step_header(
-        tool_name="execute_remediation",
-        duration_ms=duration_ms,
-        source_mode=None,
-        is_error=False,
-    )
-    step = cl.Step(name=step_title, type="tool")
-    step.input = json.dumps(
-        {
-            "service_name": service_name,
-            "action_type": action_type,
-            "status": "ABORTED_BY_OPERATOR",
-        },
-        indent=2,
-        ensure_ascii=False,
-    )
-    step.output = json.dumps(result, indent=2, ensure_ascii=False)
-    await step.send()  # type: ignore[no-untyped-call]
-
-    assistant_msg = outcome.get("assistant_message", "")
-    if assistant_msg:
-        await cl.Message(content=assistant_msg).send()  # type: ignore[no-untyped-call]
-    else:
-        await cl.Message(content=format_remediation_summary(result, "REJECTED")).send()  # type: ignore[no-untyped-call]
+    await _handle_operator_decision(action, "REJECT")

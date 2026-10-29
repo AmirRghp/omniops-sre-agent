@@ -31,17 +31,6 @@ async_session_factory: async_sessionmaker[AsyncSession] = async_sessionmaker(
 )
 
 
-async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
-    """Dependency / generator providing transactional async database session."""
-    async with async_session_factory() as session:
-        try:
-            yield session
-            await session.commit()
-        except Exception:
-            await session.rollback()
-            raise
-
-
 @asynccontextmanager
 async def session_scope() -> AsyncGenerator[AsyncSession, None]:
     """Context manager for standalone scripts and background jobs."""
@@ -52,6 +41,12 @@ async def session_scope() -> AsyncGenerator[AsyncSession, None]:
         except Exception:
             await session.rollback()
             raise
+
+
+async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
+    """Dependency / generator providing transactional async database session."""
+    async with session_scope() as session:
+        yield session
 
 
 async def init_db(target_engine: AsyncEngine | None = None) -> None:

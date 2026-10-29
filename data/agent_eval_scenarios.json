@@ -19,7 +19,7 @@
       "action_type": "increase_db_pool",
       "service_name": "payment-api",
       "parameters": {
-        "db_pool_size": 200
+        "pool_size": 200
       }
     },
     "evaluation_criteria": {
@@ -54,7 +54,7 @@
       "action_type": "increase_db_pool",
       "service_name": "payment-api",
       "parameters": {
-        "db_pool_size": 200
+        "pool_size": 200
       }
     },
     "evaluation_criteria": {
@@ -89,7 +89,7 @@
       "action_type": "increase_db_pool",
       "service_name": "auth-service",
       "parameters": {
-        "db_pool_size": 200
+        "pool_size": 200
       }
     },
     "evaluation_criteria": {
@@ -124,7 +124,7 @@
       "action_type": "increase_db_pool",
       "service_name": "payment-api",
       "parameters": {
-        "db_pool_size": 200
+        "pool_size": 200
       }
     },
     "evaluation_criteria": {
@@ -439,7 +439,7 @@
       "action_type": "increase_db_pool",
       "service_name": "payment-api",
       "parameters": {
-        "db_pool_size": 200
+        "pool_size": 200
       }
     },
     "evaluation_criteria": {

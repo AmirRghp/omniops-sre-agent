@@ -4,11 +4,12 @@ Populates baseline infrastructure microservices and realistic incident scenarios
 as specified in docs/DATABASE.md and docs/UX_FLOWS.md.
 """
 
+import argparse
 import asyncio
 from datetime import UTC, datetime
 from decimal import Decimal
 
-from sqlalchemy import delete
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.common.logger import setup_logger
@@ -103,7 +104,7 @@ async def seed_services(session: AsyncSession) -> dict[str, InfraService]:
 
 
 async def seed_incident_logs(session: AsyncSession) -> None:
-    """Populate realistic operational error logs for the active incidents."""
+    """Populate realistic operational error logs idempotently by trace_id."""
     logs_data = [
         # Scenario A logs: payment-api
         IncidentLog(
@@ -173,8 +174,12 @@ async def seed_incident_logs(session: AsyncSession) -> None:
         ),
     ]
 
+    existing_rows = await session.execute(select(IncidentLog.trace_id))
+    existing_traces = {row[0] for row in existing_rows.all() if row[0] is not None}
+
     for log in logs_data:
-        session.add(log)
+        if log.trace_id not in existing_traces:
+            session.add(log)
 
     await session.flush()
 
@@ -207,13 +212,23 @@ async def seed_database() -> None:
     logger.info("Operational database seeded successfully.")
 
 
-async def main() -> None:
+async def main(reset: bool = False) -> None:
     """Main CLI entrypoint."""
     try:
-        await reset_database()
+        if reset:
+            await reset_database()
+        else:
+            await seed_database()
     finally:
         await engine.dispose()
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    parser = argparse.ArgumentParser(description="Seed OmniOps operational database.")
+    parser.add_argument(
+        "--reset",
+        action="store_true",
+        help="Wipe existing operational records before seeding.",
+    )
+    cli_args = parser.parse_args()
+    asyncio.run(main(reset=cli_args.reset))

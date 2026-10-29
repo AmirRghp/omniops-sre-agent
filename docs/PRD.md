@@ -65,7 +65,7 @@ Build an autonomous, fault-tolerant SRE Agent and standalone MCP Server that ach
 - **Purpose:** Orchestrate multi-step reasoning (`Plan -> Call Read Tools -> Synthesize -> Propose Write Tool -> Pause for Human -> Execute -> Verify`).
 - **Acceptance Criteria:**
   - Uses `AsyncPostgresSaver` for persistent state checkpointing across turns.
-  - Triggers `interrupt_before=["execute_remediation_node"]` whenever a write tool is invoked.
+  - Triggers `interrupt_before=["remediation_node"]` whenever a write tool is invoked.
   - Enforces a hard ceiling of `MAX_STEPS = 6` and `MAX_TOKENS_PER_INCIDENT = 4096` to prevent runaway loops.
 
 ### Feature 3: Structured Tool Error Recovery & Idempotency
@@ -101,9 +101,9 @@ Build an autonomous, fault-tolerant SRE Agent and standalone MCP Server that ach
 ---
 
 ## 9. Definition of Done (DoD)
-- [ ] All 4 MCP tools implemented, unit-tested without an LLM in the loop, and exposed via MCP Server.
-- [ ] Circuit breaker cleanly switches between Live `OmniDoc RAG` (port 8080) and Local Fallback Runbooks.
-- [ ] LangGraph workflow persists state in PostgreSQL and pauses before `execute_remediation`.
-- [ ] Chainlit UI renders live tool steps and interactive Approve/Reject buttons.
-- [ ] Evaluation benchmark script runs 25 scenarios and outputs side-by-side metrics (`1.5B` vs. `7B`).
-- [ ] `ruff`, `mypy`, and `pytest` pass with 0 errors.
+- [x] All 4 MCP tools implemented, unit-tested without an LLM in the loop, and exposed via MCP Server.
+- [x] Circuit breaker cleanly switches between Live `OmniDoc RAG` (port 8080) and Local Fallback Runbooks.
+- [x] LangGraph workflow persists state in PostgreSQL and pauses before `execute_remediation`.
+- [x] Chainlit UI renders live tool steps and interactive Approve/Reject buttons.
+- [x] Evaluation benchmark script runs 25 scenarios and outputs side-by-side metrics (`1.5B` vs. `7B`).
+- [x] `ruff`, `mypy`, and `pytest` pass with 0 errors.

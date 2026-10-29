@@ -3,15 +3,11 @@
 import json
 from pathlib import Path
 
+from src.mcp_server.schemas import KNOWN_SERVICES
+
 DATA_FILE = Path("data/agent_eval_scenarios.json")
 
-VALID_SERVICES = {
-    "payment-api",
-    "auth-service",
-    "postgres-primary",
-    "redis-cache",
-    "nginx-ingress",
-}
+VALID_SERVICES = set(KNOWN_SERVICES)
 
 VALID_ACTION_TYPES = {
     "restart_service",

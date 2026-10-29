@@ -88,7 +88,7 @@ def test_exception_hierarchy() -> None:
     assert err_dict["details"] == {"k": "v"}
 
     svc_err = ServiceNotFoundError("unknown-svc", valid_services=["auth", "payment"])
-    assert svc_err.error_code == "ERR_UNKNOWN_SERVICE"
+    assert svc_err.error_code == "SERVICE_NOT_FOUND"
     assert svc_err.details["service_name"] == "unknown-svc"
     assert svc_err.details["valid_services"] == ["auth", "payment"]
 

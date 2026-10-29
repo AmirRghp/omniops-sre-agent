@@ -62,8 +62,13 @@ def _wrap_untrusted_log(message: str) -> str:
     """Enclose log text in <untrusted_log_data> tags to neutralize prompt injection."""
     clean_msg = message.strip()
     if clean_msg.startswith("<untrusted_log_data>") and clean_msg.endswith("</untrusted_log_data>"):
-        return clean_msg
-    return f"<untrusted_log_data>{clean_msg}</untrusted_log_data>"
+        inner = clean_msg[len("<untrusted_log_data>") : -len("</untrusted_log_data>")]
+    else:
+        inner = clean_msg
+    escaped_inner = inner.replace("<untrusted_log_data>", "&lt;untrusted_log_data&gt;").replace(
+        "</untrusted_log_data>", "&lt;/untrusted_log_data&gt;"
+    )
+    return f"<untrusted_log_data>{escaped_inner}</untrusted_log_data>"
 
 
 async def get_service_health(
@@ -259,7 +264,11 @@ def _apply_remediation_mutation(
     happens before any mutation, so rejected requests leave the row untouched.
     """
     if action_type == "increase_db_pool":
-        raw_pool_size = parameters.get("pool_size", parameters.get("new_pool_size"))
+        raw_pool_size = (
+            parameters.get("pool_size")
+            if "pool_size" in parameters
+            else parameters.get("db_pool_size", parameters.get("new_pool_size"))
+        )
         if (
             isinstance(raw_pool_size, bool)
             or not isinstance(raw_pool_size, int)

@@ -94,6 +94,38 @@ services:
     networks:
       - omniops-network
 
+  vllm:
+    image: vllm/vllm-openai:latest
+    container_name: omniops-vllm
+    profiles:
+      - gpu
+    restart: unless-stopped
+    ports:
+      - "8002:8000"
+    command:
+      - "--model"
+      - "${LLM_MODEL_NAME:-Qwen/Qwen2.5-7B-Instruct-AWQ}"
+      - "--quantization"
+      - "awq"
+      - "--dtype"
+      - "half"
+      - "--gpu-memory-utilization"
+      - "0.60"
+      - "--max-model-len"
+      - "8192"
+      - "--enable-auto-tool-choice"
+      - "--tool-call-parser"
+      - "hermes"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    networks:
+      - omniops-network
+
 volumes:
   postgres_data:
     name: omniops_postgres_data

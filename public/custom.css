@@ -24,10 +24,15 @@ body, .cl-user-message, .cl-assistant-message {
   line-height: 1.65;
 }
 
-/* Bi-Directional text handling */
+.cl-chat-container, .cl-message-container {
+  max-width: 900px;
+  margin-inline: auto;
+}
+
+/* Bi-Directional text handling (automatic per-paragraph direction for FA & EN) */
 p, li, blockquote {
-  direction: rtl;
-  text-align: right;
+  unicode-bidi: plaintext;
+  text-align: start;
 }
 
 /* Strictly isolate LTR for code, JSON, logs, tables, and identifiers */
@@ -50,6 +55,7 @@ pre {
   border: 1px solid #1E293B;
   border-radius: 8px;
   padding: 12px;
+  overflow-x: auto;
 }
 
 pre code {
@@ -67,6 +73,13 @@ pre code {
   margin: 12px 0;
   box-shadow: 0 0 20px rgba(245, 158, 11, 0.2);
   animation: pulse-amber-border 2.5s infinite ease-in-out;
+  overflow-x: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sre-approval-card {
+    animation: none;
+  }
 }
 
 @keyframes pulse-amber-border {
@@ -101,12 +114,12 @@ pre code {
   padding: 8px 12px;
   border-bottom: 1px solid #334155;
   text-align: right;
+  word-break: break-word;
 }
 
 .sre-approval-card td:last-child {
-  direction: ltr;
-  text-align: left;
-  font-family: var(--font-mono);
+  unicode-bidi: plaintext;
+  text-align: start;
 }
 
 .sre-params-label {
@@ -153,25 +166,4 @@ button[data-action="reject_action"]:hover,
   background-color: #DC2626 !important;
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(239, 68, 68, 0.35) !important;
-}
-
-/* Status Badges */
-.badge-rag-live {
-  background-color: rgba(16, 185, 129, 0.15);
-  color: #34D399;
-  border: 1px solid #10B981;
-  padding: 2px 8px;
-  border-radius: 9999px;
-  font-size: 0.8em;
-  font-weight: 600;
-}
-
-.badge-fallback {
-  background-color: rgba(245, 158, 11, 0.15);
-  color: #FBBF24;
-  border: 1px solid #F59E0B;
-  padding: 2px 8px;
-  border-radius: 9999px;
-  font-size: 0.8em;
-  font-weight: 600;
 }

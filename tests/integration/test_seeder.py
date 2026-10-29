@@ -65,7 +65,12 @@ async def test_seeder_execution_and_idempotency() -> None:
         ).scalar()
         assert count_before == 5
 
-    # 4. Re-run seed_database to verify idempotency (must not duplicate services or crash)
+        log_count_before = (
+            await session.execute(select(func.count()).select_from(IncidentLog))
+        ).scalar()
+        assert log_count_before == 8
+
+    # 4. Re-run seed_database to verify idempotency (must not duplicate services or logs)
     await seed_database()
 
     async with session_scope() as session:
@@ -73,3 +78,8 @@ async def test_seeder_execution_and_idempotency() -> None:
             await session.execute(select(func.count()).select_from(InfraService))
         ).scalar()
         assert count_after == 5
+
+        log_count_after = (
+            await session.execute(select(func.count()).select_from(IncidentLog))
+        ).scalar()
+        assert log_count_after == 8

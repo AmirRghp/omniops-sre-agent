@@ -118,7 +118,7 @@ This plan breaks the implementation of **OmniOps SRE Agent** into **9 Phases** a
 - **Reference Docs:** `docs/API.md`, `docs/SECURITY.md`
 - **Target Files:** `src/api/schemas.py`, `src/api/routes.py`, `main.py`, `tests/integration/test_api_endpoints.py`
 - **Implementation Details:**
-  - Implement SSE streaming generator yielding structured events (`tool_start`, `tool_output`, `approval_required`, `token`, `done`).
+  - Implement SSE streaming generator yielding structured events (`tool_call`, `tool_result`, `approval_required`, `token`, `done`).
   - Implement `/api/v1/incident/approve` to resume interrupted threads.
 - **Verification:** `pytest tests/integration/test_api_endpoints.py -v`
 

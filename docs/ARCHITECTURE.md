@@ -92,7 +92,6 @@ omniops-sre-agent/
 │   └── prompts.yaml                     # SRE system prompt, safety rules, formatting rules
 ├── data/
 │   ├── fallback_runbooks.json           # Self-contained fallback runbooks when Project 1 is offline
-│   ├── seed_incidents.sql               # Realistic operational telemetry, logs, and services
 │   └── agent_eval_scenarios.json        # 25 multi-step SRE evaluation scenarios
 ├── docs/                                # Complete Vibe Coding Blueprint Suite
 │   ├── PRD.md
@@ -132,7 +131,8 @@ omniops-sre-agent/
 │   ├── agent/
 │   │   ├── state.py                     # IncidentState TypedDict (messages, steps, pending_action)
 │   │   ├── nodes.py                     # Planner, ReadToolNode, ApprovalGate, WriteToolNode
-│   │   └── graph.py                     # LangGraph builder with AsyncPostgresSaver
+│   │   ├── graph.py                     # LangGraph builder with AsyncPostgresSaver
+│   │   └── ui_helpers.py                # Chainlit UI formatting and HITL card presenters
 │   └── api/
 │       ├── routes.py                    # FastAPI endpoints (/incident/stream, /incident/approve)
 │       └── schemas.py                   # API Request/Response contracts

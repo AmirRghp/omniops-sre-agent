@@ -63,7 +63,7 @@
     "recommended_action": {
       "action_type": "increase_db_pool",
       "parameters": {
-        "db_pool_size": 200
+        "pool_size": 200
       }
     }
   },

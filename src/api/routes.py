@@ -4,7 +4,7 @@ import json
 from collections.abc import AsyncIterator
 from typing import Any, cast
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 from fastapi.responses import StreamingResponse
 from langchain_core.messages import AIMessage, AnyMessage, HumanMessage, ToolMessage
 from langchain_core.runnables import RunnableConfig
@@ -12,12 +12,31 @@ from langchain_core.runnables import RunnableConfig
 from src.agent.graph import postgres_graph, resume_with_approval
 from src.agent.state import IncidentState
 from src.api.schemas import ApprovalRequest, IncidentStreamRequest
+from src.common.config import get_settings
 from src.common.logger import setup_logger
 from src.db.seed import reset_database
 
 logger = setup_logger("api_routes")
 
-router = APIRouter()
+
+async def verify_api_key(
+    x_api_key: str | None = Header(default=None, alias="X-API-Key"),
+) -> None:
+    """Enforce API key authentication in production or when an X-API-Key header is sent."""
+    settings = get_settings()
+    if settings.ENV == "production" or x_api_key is not None:
+        if x_api_key != settings.API_KEY:
+            raise HTTPException(
+                status_code=401,
+                detail={
+                    "status": "error",
+                    "error_code": "UNAUTHORIZED",
+                    "message": "Invalid or missing X-API-Key header.",
+                },
+            )
+
+
+router = APIRouter(dependencies=[Depends(verify_api_key)])
 
 
 def _sse(event: str, data: dict[str, Any]) -> str:
