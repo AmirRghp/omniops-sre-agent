@@ -1,0 +1,177 @@
+/* OmniOps SRE Command Center — Custom Styling (DESIGN_SYSTEM.md) */
+
+@import url('https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root {
+  --sre-bg-dark: #0B0F19;
+  --sre-surface: #111827;
+  --sre-elevated: #1E293B;
+  --sre-text-primary: #F8FAFC;
+  --sre-text-muted: #94A3B8;
+  --sre-border-default: #1E293B;
+  --sre-active-sky: #0EA5E9;
+  --sre-emerald-rag: #10B981;
+  --sre-amber-caution: #F59E0B;
+  --sre-rose-danger: #EF4444;
+  --font-persian: 'Vazirmatn', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', ui-monospace, SFMono-Regular, monospace;
+}
+
+/* Global typography & base */
+body, .cl-user-message, .cl-assistant-message {
+  font-family: var(--font-persian);
+  line-height: 1.65;
+}
+
+/* Bi-Directional text handling */
+p, li, blockquote {
+  direction: rtl;
+  text-align: right;
+}
+
+/* Strictly isolate LTR for code, JSON, logs, tables, and identifiers */
+pre, code, .sre-ltr, [dir="ltr"] {
+  direction: ltr !important;
+  text-align: left !important;
+  font-family: var(--font-mono) !important;
+}
+
+code {
+  background-color: rgba(30, 41, 59, 0.7);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.9em;
+  color: #38BDF8;
+}
+
+pre {
+  background-color: #0d131f !important;
+  border: 1px solid #1E293B;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+pre code {
+  background-color: transparent !important;
+  padding: 0;
+  color: #E2E8F0;
+}
+
+/* High-Friction Consequential Gate: HITL Approval Card */
+.sre-approval-card {
+  background-color: var(--sre-elevated);
+  border: 2px solid var(--sre-amber-caution);
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin: 12px 0;
+  box-shadow: 0 0 20px rgba(245, 158, 11, 0.2);
+  animation: pulse-amber-border 2.5s infinite ease-in-out;
+}
+
+@keyframes pulse-amber-border {
+  0% {
+    box-shadow: 0 0 10px rgba(245, 158, 11, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 22px rgba(245, 158, 11, 0.4);
+  }
+  100% {
+    box-shadow: 0 0 10px rgba(245, 158, 11, 0.2);
+  }
+}
+
+.sre-approval-card h3 {
+  color: #FBBF24;
+  margin-top: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+}
+
+.sre-approval-card table {
+  width: 100%;
+  margin: 12px 0;
+  border-collapse: collapse;
+  direction: rtl;
+}
+
+.sre-approval-card th, .sre-approval-card td {
+  padding: 8px 12px;
+  border-bottom: 1px solid #334155;
+  text-align: right;
+}
+
+.sre-approval-card td:last-child {
+  direction: ltr;
+  text-align: left;
+  font-family: var(--font-mono);
+}
+
+.sre-params-label {
+  margin-top: 10px;
+  font-weight: 600;
+  color: #CBD5E1;
+  font-size: 0.9em;
+}
+
+/* Action Buttons Styling */
+button[id*="approve_action"],
+button[data-action="approve_action"],
+.cl-action[id*="approve_action"] {
+  background-color: var(--sre-emerald-rag) !important;
+  color: #ffffff !important;
+  font-weight: 600 !important;
+  border-radius: 8px !important;
+  border: none !important;
+  transition: all 0.2s ease-in-out !important;
+}
+
+button[id*="approve_action"]:hover,
+button[data-action="approve_action"]:hover,
+.cl-action[id*="approve_action"]:hover {
+  background-color: #059669 !important;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.35) !important;
+}
+
+button[id*="reject_action"],
+button[data-action="reject_action"],
+.cl-action[id*="reject_action"] {
+  background-color: var(--sre-rose-danger) !important;
+  color: #ffffff !important;
+  font-weight: 600 !important;
+  border-radius: 8px !important;
+  border: none !important;
+  transition: all 0.2s ease-in-out !important;
+}
+
+button[id*="reject_action"]:hover,
+button[data-action="reject_action"]:hover,
+.cl-action[id*="reject_action"]:hover {
+  background-color: #DC2626 !important;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.35) !important;
+}
+
+/* Status Badges */
+.badge-rag-live {
+  background-color: rgba(16, 185, 129, 0.15);
+  color: #34D399;
+  border: 1px solid #10B981;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-size: 0.8em;
+  font-weight: 600;
+}
+
+.badge-fallback {
+  background-color: rgba(245, 158, 11, 0.15);
+  color: #FBBF24;
+  border: 1px solid #F59E0B;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-size: 0.8em;
+  font-weight: 600;
+}

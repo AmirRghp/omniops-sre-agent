@@ -20,7 +20,8 @@ htmlcov/
 .ruff_cache/
 
 # Chainlit
-.chainlit/
+.chainlit/*
+!.chainlit/config.toml
 
 # IDE files
 .vscode/
