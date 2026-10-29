@@ -69,9 +69,7 @@ async def test_database_table_creation_and_crud() -> None:
         assert queried_svc.cpu_usage_pct == Decimal("88.50")
 
         # Query incident log
-        log_stmt = select(IncidentLog).where(
-            IncidentLog.service_name == "test-integration-svc"
-        )
+        log_stmt = select(IncidentLog).where(IncidentLog.service_name == "test-integration-svc")
         result = await session.execute(log_stmt)
         logs = list(result.scalars().all())
         assert len(logs) >= 1
