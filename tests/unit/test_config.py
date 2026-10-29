@@ -57,7 +57,7 @@ def test_load_yaml_config() -> None:
     assert isinstance(cfg, dict)
     assert cfg["app"]["name"] == "omniops-sre-agent"
     assert cfg["agent"]["max_steps"] == 6
-    assert cfg["circuit_breaker"]["request_timeout_seconds"] == 1.5
+    assert cfg["circuit_breaker"]["request_timeout_seconds"] == 2.5
 
 
 def test_load_yaml_config_missing_file(tmp_path: Path) -> None:

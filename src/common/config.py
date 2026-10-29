@@ -39,7 +39,7 @@ class Settings(BaseSettings):
     # Agent Constraints & Limits
     MAX_AGENT_STEPS: int = Field(default=6, ge=1, le=20, validation_alias="MAX_AGENT_STEPS")
     MAX_AGENT_TOKENS: int = Field(
-        default=4096, ge=512, le=32768, validation_alias="MAX_AGENT_TOKENS"
+        default=8192, ge=512, le=32768, validation_alias="MAX_AGENT_TOKENS"
     )
     API_KEY: str = "dev-secret-key-12345"
 

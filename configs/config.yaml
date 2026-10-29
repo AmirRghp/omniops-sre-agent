@@ -5,13 +5,13 @@ app:
 
 agent:
   max_steps: 6
-  max_tokens: 4096
+  max_tokens: 8192
   timeout_seconds: 60.0
 
 circuit_breaker:
-  request_timeout_seconds: 1.5
+  request_timeout_seconds: 2.5
   failure_threshold: 3
   recovery_timeout_seconds: 30.0
 
 tools:
-  execution_timeout_seconds: 5.0
+  execution_timeout_seconds: 10.0

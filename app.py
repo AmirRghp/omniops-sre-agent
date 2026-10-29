@@ -29,6 +29,12 @@ cl_config.ui.custom_css = "/public/custom.css"
 cl_config.ui.cot = "full"
 
 
+@cl.data_layer  # type: ignore[arg-type]
+def disable_chainlit_data_layer() -> None:
+    """Disable default Chainlit Data Layer since OmniOps manages state in LangGraph Postgres."""
+    return None
+
+
 async def _send_approval_card(thread_id: str, pending: dict[str, Any]) -> None:
     """Render the interactive HITL approval card and action buttons."""
     card_md = format_approval_card(pending)

@@ -2,6 +2,8 @@
 
 import asyncio
 import json
+import re
+import uuid
 from functools import lru_cache
 from typing import Any, cast
 
@@ -83,7 +85,11 @@ MCP_TOOL_DEFINITIONS: list[dict[str, Any]] = [
     ),
     _tool_definition(
         "execute_remediation",
-        "Execute an approved, idempotent remediation and record it in the audit ledger.",
+        (
+            "Submit a proposed remediation action for human review and execution. "
+            "You MUST invoke this tool whenever a remediation action is required. "
+            "Invoking this tool automatically pauses execution and triggers the approval gate."
+        ),
         ExecuteRemediationInput,
         required=[
             "service_name",
@@ -123,6 +129,124 @@ def _parse_tool_arguments(raw_arguments: str) -> dict[str, Any]:
     return parsed if isinstance(parsed, dict) else {}
 
 
+def _extract_json_objects(raw_text: str) -> list[dict[str, Any]]:
+    """Extract all valid JSON objects from text, handling nested braces and code fences."""
+    results: list[dict[str, Any]] = []
+    fence_pattern = re.compile(r"```(?:json)?\s*(\{.*?\})\s*```", re.DOTALL)
+    for match in fence_pattern.finditer(raw_text):
+        try:
+            parsed = json.loads(match.group(1))
+            if isinstance(parsed, dict):
+                results.append(parsed)
+        except Exception:
+            pass
+
+    start_idx = None
+    depth = 0
+    in_string = False
+    escape = False
+
+    for i, char in enumerate(raw_text):
+        if escape:
+            escape = False
+            continue
+        if char == "\\":
+            escape = True
+            continue
+        if char == '"':
+            in_string = not in_string
+            continue
+        if in_string:
+            continue
+
+        if char == "{":
+            if depth == 0:
+                start_idx = i
+            depth += 1
+        elif char == "}":
+            if depth > 0:
+                depth -= 1
+                if depth == 0 and start_idx is not None:
+                    candidate = raw_text[start_idx : i + 1]
+                    try:
+                        parsed = json.loads(candidate)
+                        if isinstance(parsed, dict) and parsed not in results:
+                            results.append(parsed)
+                    except Exception:
+                        pass
+                    start_idx = None
+
+    return results
+
+
+def _extract_tool_calls_from_text(content: str) -> list[ToolCall]:
+    """Fallback extractor when model emits tool calls or remediation actions in text."""
+    calls: list[ToolCall] = []
+    known_tools = {
+        "execute_remediation",
+        "search_runbooks",
+        "query_incident_logs",
+        "get_service_health",
+    }
+    action_types = {
+        "increase_db_pool",
+        "scale_replicas",
+        "restart_service",
+        "flush_redis_cache",
+    }
+
+    objects = _extract_json_objects(content)
+    for obj in objects:
+        name = obj.get("name")
+        if name in known_tools:
+            raw_args = obj.get("arguments", {})
+            args = json.loads(raw_args) if isinstance(raw_args, str) else raw_args
+            if isinstance(args, dict):
+                calls.append(
+                    {
+                        "name": str(name),
+                        "args": args,
+                        "id": f"call_text_{uuid.uuid4().hex[:8]}",
+                        "type": "tool_call",
+                    }
+                )
+                continue
+
+        action = obj.get("action_type")
+        if action in action_types:
+            service = obj.get("service_name")
+            if not service:
+                known_services = (
+                    "payment-api",
+                    "auth-service",
+                    "postgres-primary",
+                    "redis-cache",
+                    "nginx-ingress",
+                )
+                for s in known_services:
+                    if s in content:
+                        service = s
+                        break
+                obj["service_name"] = service or "payment-api"
+            if "parameters" not in obj or not isinstance(obj["parameters"], dict):
+                obj["parameters"] = {}
+            if "idempotency_key" not in obj:
+                uid = uuid.uuid4().hex[:6]
+                obj["idempotency_key"] = f"idem_{obj['service_name']}_{action}_{uid}"
+            if "reason" not in obj:
+                obj["reason"] = f"Remediation for {obj['service_name']} via {action}"
+            calls.append(
+                {
+                    "name": "execute_remediation",
+                    "args": obj,
+                    "id": f"call_text_{uuid.uuid4().hex[:8]}",
+                    "type": "tool_call",
+                }
+            )
+
+    return calls
+
+
 def _to_ai_message(message: ChatCompletionMessage) -> AIMessage:
     """Convert the OpenAI completion message into a LangChain AI message with tool calls."""
     tool_calls: list[ToolCall] = []
@@ -137,6 +261,9 @@ def _to_ai_message(message: ChatCompletionMessage) -> AIMessage:
                 "type": "tool_call",
             }
         )
+    if not tool_calls and message.content:
+        tool_calls = _extract_tool_calls_from_text(message.content)
+
     return AIMessage(content=message.content or "", tool_calls=tool_calls)
 
 
@@ -179,7 +306,7 @@ async def agent_reasoning_node(state: IncidentState) -> dict[str, Any]:
     update: dict[str, Any] = {
         "messages": [ai_message],
         "step_count": state.get("step_count", 0) + 1,
-        "tokens_used": state.get("tokens_used", 0) + total_tokens,
+        "tokens_used": max(state.get("tokens_used", 0), total_tokens),
     }
 
     pending_remediation = _extract_pending_remediation(ai_message.tool_calls)

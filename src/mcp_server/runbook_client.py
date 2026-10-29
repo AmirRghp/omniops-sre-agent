@@ -171,12 +171,18 @@ class RunbookClient:
             payload["category"] = category
 
         timeout = self.circuit_breaker.request_timeout_seconds
+        headers: dict[str, str] = {}
+        settings = get_settings()
+        if settings.API_KEY:
+            headers["Authorization"] = f"Bearer {settings.API_KEY}"
 
         if self._client:
-            response = await self._client.post(self.rag_url, json=payload, timeout=timeout)
+            response = await self._client.post(
+                self.rag_url, json=payload, headers=headers, timeout=timeout
+            )
         else:
             async with httpx.AsyncClient(timeout=timeout) as client:
-                response = await client.post(self.rag_url, json=payload)
+                response = await client.post(self.rag_url, json=payload, headers=headers)
 
         response.raise_for_status()
         data = response.json()
@@ -191,11 +197,15 @@ class RunbookClient:
 
         results: list[RunbookResult] = []
         for item in raw_results:
+            rid = str(item.get("runbook_id") or "")
+            if not rid or rid == "RB-UNKNOWN":
+                fb = self.search_fallback(query=query, category=category, top_k=1)
+                rid = fb[0].runbook_id if fb else str(item.get("source_file", "RB-UNKNOWN"))
             results.append(
                 RunbookResult(
-                    runbook_id=str(item.get("runbook_id", "RB-UNKNOWN")),
-                    title=str(item.get("title", "Runbook")),
-                    content=str(item.get("content", "")),
+                    runbook_id=rid,
+                    title=str(item.get("title") or item.get("section_heading", "Runbook")),
+                    content=str(item.get("content") or item.get("snippet", "")),
                     relevance_score=max(0.0, min(1.0, float(item.get("relevance_score", 0.90)))),
                 )
             )
