@@ -126,6 +126,13 @@ make run-ui
 
 > **Windows Compatibility Note:** On Windows systems, `python run_app.py` sets `WindowsSelectorEventLoopPolicy` to ensure non-blocking async PostgreSQL pooling with psycopg under LangGraph.
 
+### Option C: Full Ecosystem Integration (Running with Project 1: OmniDoc RAG)
+Run both portfolio projects together on the same workstation, sharing a single local vLLM 7B instance on 16GB VRAM:
+- **Project 1 (`OmniDoc RAG`):** Live technical runbook retrieval and hybrid search on port `8080`.
+- **Project 2 (`OmniOps SRE Agent`):** Autonomous triage, Circuit Breaker query, and HITL approval gate on port `8001`.
+
+📖 **Step-by-step setup commands, terminal flows, and verification guide:** See the complete [Ecosystem Integration Guide](docs/ECOSYSTEM_INTEGRATION.md).
+
 ---
 
 ## 5. Universal MCP Server Integration
