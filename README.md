@@ -3,6 +3,8 @@
 > **Autonomous Incident Response & Model Context Protocol (MCP) Platform**
 > *Project 2 of the AI Engineering Roadmap — Built for Autonomous Triage, Deterministic MCP Tooling, and Human-in-the-Loop Infrastructure Safety.*
 
+[English](README.md) | [فارسی](README.fa.md)
+
 [![CI Quality Gate](https://github.com/AmirRghp/omniops-sre-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/AmirRghp/omniops-sre-agent/actions/workflows/ci.yml)
 [![Deterministic Benchmark](https://github.com/AmirRghp/omniops-sre-agent/actions/workflows/agent-evals.yml/badge.svg)](https://github.com/AmirRghp/omniops-sre-agent/actions/workflows/agent-evals.yml)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
